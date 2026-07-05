@@ -1,0 +1,19 @@
+# Byte-compiled / optimized / diff files
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Databases
+*.sqlite3
+
+# Media files (Optional: agar aap generated QR codes ko push nahi karna chahte)
+media/qr_codes/
+
+# OS files
+.DS_Store
+Thumbs.db

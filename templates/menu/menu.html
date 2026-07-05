@@ -1,0 +1,225 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Menu – Table {{ table_number }}</title>
+  <link rel="stylesheet" href="{% static 'css/menu.css' %}" />
+</head>
+<body>
+
+  <header>
+    <h1>Our Menu</h1>
+    {% if table_number %}
+      <p class="table-badge">Table {{ table_number }}</p>
+    {% endif %}
+  </header>
+
+  <main>
+    {% for category in categories %}
+      <section class="category-section">
+        <h2 class="category-title">{{ category.name }}</h2>
+        <div class="menu-grid">
+          {% for item in category.items.all %}
+            <div class="menu-card" data-item-id="{{ item.id }}"
+                 data-item-name="{{ item.name }}"
+                 data-item-price="{{ item.price }}">
+              {% if item.image %}
+                <img src="{{ item.image.url }}" alt="{{ item.name }}" />
+              {% else %}
+                <div class="placeholder-img">🍽️</div>
+              {% endif %}
+              <div class="card-body">
+                <h3>{{ item.name }}</h3>
+                <p class="desc">{{ item.description|truncatewords:15 }}</p>
+                <p class="price">${{ item.price }}</p>
+                <button class="add-to-cart-btn">Add to Cart</button>
+              </div>
+            </div>
+          {% empty %}
+            <p>No items available in this category.</p>
+          {% endfor %}
+        </div>
+      </section>
+    {% empty %}
+      <p class="empty-msg">Menu is being updated. Please check back later.</p>
+    {% endfor %}
+  </main>
+
+  <!-- Floating Cart Summary -->
+  <aside id="cart-sidebar" class="cart-closed">
+    <div class="cart-header">
+      <h3>Your Cart</h3>
+      <span id="cart-count">0</span>
+    </div>
+    <ul id="cart-items"></ul>
+    <div class="cart-footer">
+      <p>Total: $<span id="cart-total">0.00</span></p>
+      <button id="place-order-btn">Place Order</button>
+    </div>
+  </aside>
+
+  <script>
+    (function() {
+      /* =========================================================
+         JS BRIDGE – Cart + Order Submission
+         Reads ?table= from URL, uses localStorage, POSTs to API.
+         ========================================================= */
+
+      const TABLE_NUMBER = new URLSearchParams(window.location.search).get('table') || '';
+      const API_ORDER_URL = "{% url 'api_place_order' %}";
+      const CSRF_TOKEN = "{{ csrf_token }}";
+
+      /* ---------- Cart (localStorage) ---------- */
+      const STORAGE_KEY = 'hotel_cart';
+
+      function getCart() {
+        try {
+          return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        } catch { return []; }
+      }
+
+      function saveCart(cart) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cart));
+        renderCart();
+      }
+
+      function addToCart(itemId, itemName, price) {
+        const cart = getCart();
+        const existing = cart.find(i => i.menu_item_id === itemId);
+        if (existing) {
+          existing.quantity += 1;
+        } else {
+          cart.push({ menu_item_id: itemId, item_name: itemName, unit_price: parseFloat(price), quantity: 1 });
+        }
+        saveCart(cart);
+      }
+
+      function removeFromCart(itemId) {
+        let cart = getCart().filter(i => i.menu_item_id !== itemId);
+        saveCart(cart);
+      }
+
+      function updateQuantity(itemId, delta) {
+        const cart = getCart();
+        const item = cart.find(i => i.menu_item_id === itemId);
+        if (!item) return;
+        item.quantity = Math.max(1, item.quantity + delta);
+        saveCart(cart);
+      }
+
+      function clearCart() {
+        localStorage.removeItem(STORAGE_KEY);
+        renderCart();
+      }
+
+      /* ---------- Render Cart UI ---------- */
+      function renderCart() {
+        const cart = getCart();
+        const list = document.getElementById('cart-items');
+        const countEl = document.getElementById('cart-count');
+        const totalEl = document.getElementById('cart-total');
+
+        countEl.textContent = cart.reduce((s, i) => s + i.quantity, 0);
+
+        if (cart.length === 0) {
+          list.innerHTML = '<li class="empty-cart">Cart is empty</li>';
+          totalEl.textContent = '0.00';
+          return;
+        }
+
+        list.innerHTML = cart.map(i => `
+          <li>
+            <span class="cart-item-name">${i.item_name}</span>
+            <div class="cart-controls">
+              <button class="qty-btn" data-id="${i.menu_item_id}" data-delta="-1">−</button>
+              <span class="qty">${i.quantity}</span>
+              <button class="qty-btn" data-id="${i.menu_item_id}" data-delta="1">+</button>
+              <span class="cart-price">$${(i.unit_price * i.quantity).toFixed(2)}</span>
+              <button class="remove-btn" data-id="${i.menu_item_id}">✕</button>
+            </div>
+          </li>
+        `).join('');
+
+        totalEl.textContent = cart.reduce((s, i) => s + i.unit_price * i.quantity, 0).toFixed(2);
+      }
+
+      /* ---------- Place Order (Fetch API) ---------- */
+      async function placeOrder() {
+        const cart = getCart();
+        if (cart.length === 0) {
+          alert('Your cart is empty.');
+          return;
+        }
+        if (!TABLE_NUMBER) {
+          alert('Table number not found. Please scan the QR code again.');
+          return;
+        }
+
+        const payload = {
+          table_number: parseInt(TABLE_NUMBER, 10),
+          note: '',
+          items: cart
+        };
+
+        try {
+          const resp = await fetch(API_ORDER_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': CSRF_TOKEN
+            },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await resp.json();
+
+          if (resp.ok && data.success) {
+            alert(`✅ Order ${data.order_id} placed! Total: $${data.total}`);
+            clearCart();
+          } else {
+            alert(`❌ Order failed: ${JSON.stringify(data)}`);
+          }
+        } catch (err) {
+          alert(`❌ Network error: ${err.message}`);
+        }
+      }
+
+      /* ---------- Event Delegation ---------- */
+      document.addEventListener('DOMContentLoaded', function() {
+        renderCart();
+
+        /* "Add to Cart" buttons on menu cards */
+        document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+          btn.addEventListener('click', function(e) {
+            const card = this.closest('.menu-card');
+            const id = parseInt(card.dataset.itemId, 10);
+            const name = card.dataset.itemName;
+            const price = card.dataset.itemPrice;
+            addToCart(id, name, price);
+          });
+        });
+
+        /* Cart sidebar quantity / remove buttons */
+        document.getElementById('cart-items').addEventListener('click', function(e) {
+          const target = e.target;
+          const id = parseInt(target.dataset.id, 10);
+          if (!id) return;
+
+          if (target.classList.contains('qty-btn')) {
+            updateQuantity(id, parseInt(target.dataset.delta, 10));
+          } else if (target.classList.contains('remove-btn')) {
+            removeFromCart(id);
+          }
+        });
+
+        /* Place Order */
+        document.getElementById('place-order-btn').addEventListener('click', placeOrder);
+      });
+
+    })();
+  </script>
+
+</body>
+</html>
