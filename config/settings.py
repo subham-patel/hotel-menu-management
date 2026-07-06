@@ -128,4 +128,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-SITE_DOMAIN = "http://localhost:8000"
+import os
+
+SITE_DOMAIN = os.environ.get("SITE_DOMAIN", "http://localhost:8000")
