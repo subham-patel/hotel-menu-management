@@ -23,10 +23,22 @@ main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; }
 .add-to-cart-btn:hover { background: #16213e; }
 
 /* Cart Sidebar */
-#cart-sidebar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; box-shadow: 0 -2px 12px rgba(0,0,0,0.15); padding: 0.75rem 1rem; z-index: 20; }
-.cart-header { display: flex; justify-content: space-between; align-items: center; }
+#cart-sidebar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
+  padding: 0.75rem 1rem;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  max-height: 45vh;
+}
+.cart-header { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
 #cart-count { background: #e94560; color: #fff; border-radius: 50%; padding: 0.1rem 0.5rem; font-size: 0.8rem; }
-#cart-items { list-style: none; max-height: 180px; overflow-y: auto; margin: 0.5rem 0; padding: 0; }
+#cart-items { list-style: none; overflow-y: auto; margin: 0.5rem 0; padding: 0; flex: 1; min-height: 0; }
 #cart-items li { display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0; border-bottom: 1px solid #eee; }
 .empty-cart { text-align: center; color: #999; }
 .cart-item-name { font-size: 0.9rem; flex: 1; }
@@ -35,7 +47,7 @@ main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; }
 .qty { min-width: 1.2rem; text-align: center; font-size: 0.9rem; }
 .cart-price { font-size: 0.85rem; min-width: 3.5rem; text-align: right; }
 .remove-btn { background: #fce4e4; color: #c00; }
-.cart-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ddd; padding-top: 0.5rem; }
+.cart-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ddd; padding-top: 0.5rem; flex-shrink: 0; }
 .cart-footer p { font-weight: 700; }
 #place-order-btn { padding: 0.5rem 1.5rem; background: #e94560; color: #fff; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; }
 #place-order-btn:hover { background: #d63851; }

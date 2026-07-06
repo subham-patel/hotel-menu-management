@@ -145,7 +145,7 @@
         totalEl.textContent = cart.reduce((s, i) => s + i.unit_price * i.quantity, 0).toFixed(2);
       }
 
-      /* ---------- Place Order (Fetch API) ---------- */
+        /* ---------- Place Order (Fetch API) ---------- */
       async function placeOrder() {
         const cart = getCart();
         if (cart.length === 0) {
@@ -154,6 +154,10 @@
         }
         if (!TABLE_NUMBER) {
           alert('Table number not found. Please scan the QR code again.');
+          return;
+        }
+
+        if (!confirm('Are you sure you want to place this order?')) {
           return;
         }
 
