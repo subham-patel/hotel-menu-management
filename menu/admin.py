@@ -13,9 +13,28 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(MenuItem)
 class MenuItemAdmin(admin.ModelAdmin):
-    list_display = ["name", "category", "price", "available"]
+    list_display = ["name", "category", "price", "available", "image_preview"]
     list_filter = ["category", "available"]
     list_editable = ["available"]
+    readonly_fields = ["image_preview"]
+    fieldsets = [
+        (None, {
+            "fields": ["category", "name", "description", "price", "available"],
+        }),
+        ("Image", {
+            "fields": ["image", "image_preview"],
+        }),
+    ]
+
+    def image_preview(self, obj):
+        try:
+            if obj.image and obj.image.storage.exists(obj.image.name):
+                return mark_safe(f'<img src="{obj.image.url}" width="120" style="border-radius:8px;object-fit:cover" />')
+            return mark_safe('<span style="color:#999">No image uploaded</span>')
+        except Exception:
+            return mark_safe('<span style="color:#999">Image unavailable</span>')
+
+    image_preview.short_description = "Preview"
 
 
 @admin.register(Table)
@@ -51,13 +70,16 @@ class TableAdmin(admin.ModelAdmin):
 
     def qr_code_preview(self, obj):
         try:
-            if obj.qr_code and obj.qr_code.storage.exists(obj.qr_code.name):
+            img = ''
+            if obj.qr_code_data:
+                img = f'<img src="data:image/png;base64,{obj.qr_code_data}" width="100" height="100" style="display:block;margin-bottom:4px" />'
+            elif obj.qr_code and obj.qr_code.storage.exists(obj.qr_code.name):
                 img = f'<img src="{obj.qr_code.url}" width="100" height="100" style="display:block;margin-bottom:4px" />'
             else:
-                img = '<span style="color:#999">File missing</span>'
+                img = '<span style="color:#999">QR unavailable</span>'
             url = f"../{obj.id}/regenerate-qr/"
             return mark_safe(
-                f'{img}<a href="{url}" style="font-size:0.75rem" onclick="return confirm(\'Regenerate QR code for Table {obj.number}? This will update the QR image.\')">🔄 Regenerate</a>'
+                f'{img}<a href="{url}" style="font-size:0.75rem" onclick="return confirm(\'Regenerate QR code for Table {obj.number}?\')">🔄 Regenerate</a>'
             )
         except Exception:
             return mark_safe("—")

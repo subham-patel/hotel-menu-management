@@ -9,28 +9,45 @@
 </head>
 <body>
 
-  <!-- ═══════════ Hero ═══════════ -->
+  <!-- ═══════════ HERO ═══════════ -->
   <header class="hero" id="hero">
-    <div class="hero-top">
-      <div class="hero-brand">{{ restaurant_name }} <span>{{ restaurant_suffix }}</span></div>
-      <div class="hero-sub">
-        <span class="table-badge">Table {{ table_number }}</span>
+    <div class="hero-bg-shapes"></div>
+    <div class="hero-content">
+      <div class="hero-brand-row">
+        <div class="hero-icon">🍽️</div>
+        <div>
+          <div class="hero-brand">{{ restaurant_name }} <span>{{ restaurant_suffix }}</span></div>
+          <div class="hero-tagline">Fine Dining • Digital Menu</div>
+        </div>
+      </div>
+      <div class="hero-meta">
+        <span class="table-badge">📍 Table {{ table_number }}</span>
         <span class="greeting" id="greeting"></span>
       </div>
     </div>
   </header>
 
-  <!-- ═══════════ Category Tabs ═══════════ -->
-  <nav class="category-nav" id="categoryNav">
-    {% for category in categories %}
-      <button class="cat-tab{% if forloop.first %} active{% endif %}" data-target="cat-{{ category.id }}">
-        {{ category.name }}
-        <span class="cat-count">{{ category.items.count }}</span>
-      </button>
-    {% endfor %}
-  </nav>
+  <!-- ═══════════ SEARCH + CATEGORY NAV ═══════════ -->
+  <div class="sticky-bar">
+    <div class="search-wrap">
+      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="search-input" class="search-input" placeholder="Search menu items..." autocomplete="off" />
+      <button class="search-clear" id="search-clear" aria-label="Clear search">&times;</button>
+    </div>
+    <nav class="category-nav" id="categoryNav">
+      {% for category in categories %}
+        <button class="cat-tab{% if forloop.first %} active{% endif %}" data-target="cat-{{ category.id }}">
+          <span class="cat-icon">
+            {% cycle '🥗' '🍛' '🍝' '🥘' '🍕' '🥪' '🍰' '🥤' %}
+          </span>
+          {{ category.name }}
+          <span class="cat-count">{{ category.items.count }}</span>
+        </button>
+      {% endfor %}
+    </nav>
+  </div>
 
-  <!-- ═══════════ Menu Grid ═══════════ -->
+  <!-- ═══════════ MENU GRID ═══════════ -->
   <main>
     {% for category in categories %}
       <section class="category-section" id="cat-{{ category.id }}">
@@ -39,7 +56,7 @@
           {% for item in category.items.all %}
             <div class="menu-card reveal"
                  data-item-id="{{ item.id }}"
-                 data-item-name="{{ item.name }}"
+                 data-item-name="{{ item.name|lower }}"
                  data-item-price="{{ item.price }}">
               <div class="menu-card-img-wrap">
                 {% if item.image %}
@@ -48,10 +65,15 @@
                   <div class="placeholder-img">🍽️</div>
                 {% endif %}
                 <span class="card-badge">{{ category.name }}</span>
+                {% if not item.available %}
+                  <span class="card-unavailable">Unavailable</span>
+                {% endif %}
               </div>
               <div class="menu-card-body">
                 <h3>{{ item.name }}</h3>
-                <p class="desc">{{ item.description|truncatewords:15 }}</p>
+                {% if item.description %}
+                  <p class="desc">{{ item.description|truncatewords:12 }}</p>
+                {% endif %}
                 <div class="menu-card-footer">
                   <span class="price">₹{{ item.price }}</span>
                   <div class="card-actions">
@@ -77,9 +99,19 @@
         <p>Menu is being updated. Please check back later.</p>
       </div>
     {% endfor %}
+    <div class="no-results" id="no-results" style="display:none">
+      <span class="empty-icon">🔍</span>
+      <h3>No items found</h3>
+      <p>Try a different search term.</p>
+    </div>
   </main>
 
-  <!-- ═══════════ Cart FAB ═══════════ -->
+  <!-- ═══════════ ORDER HISTORY BADGE ═══════════ -->
+  <div id="order-history-toast" class="order-history-toast" style="display:none">
+    <span>🕐 </span><span id="last-order-info"></span>
+  </div>
+
+  <!-- ═══════════ CART FAB ═══════════ -->
   <button id="cart-fab" aria-label="Open cart">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
@@ -88,10 +120,10 @@
     <span id="cart-fab-count">0</span>
   </button>
 
-  <!-- ═══════════ Cart Overlay ═══════════ -->
+  <!-- ═══════════ CART OVERLAY ═══════════ -->
   <div id="cart-overlay"></div>
 
-  <!-- ═══════════ Cart Drawer ═══════════ -->
+  <!-- ═══════════ CART DRAWER ═══════════ -->
   <aside id="cart-drawer">
     <div class="cart-handle" id="cart-drag-handle"></div>
     <div class="cart-drawer-header">
@@ -109,6 +141,16 @@
       </li>
     </ul>
     <div class="cart-drawer-footer">
+      <div class="cart-summary">
+        <div class="cart-summary-row">
+          <span>Subtotal</span>
+          <span id="cart-subtotal">₹0.00</span>
+        </div>
+        <div class="cart-summary-row">
+          <span>Items</span>
+          <span id="cart-item-count">0</span>
+        </div>
+      </div>
       <div class="cart-total-row">
         <span class="cart-total-label">Total</span>
         <span id="cart-total">₹0.00</span>
@@ -124,12 +166,13 @@
     </div>
   </aside>
 
-  <!-- ═══════════ Payment Overlay ═══════════ -->
+  <!-- ═══════════ PAYMENT MODAL ═══════════ -->
   <div id="payment-overlay">
     <div id="payment-modal">
       <div class="payment-modal-header">
-        <h2>Select Payment Method</h2>
-        <p>Choose how you'd like to pay</p>
+        <button class="payment-modal-back" id="payment-modal-back" aria-label="Back">&larr;</button>
+        <h2>Complete Order</h2>
+        <p>Select your payment method</p>
       </div>
       <div class="payment-total-display">
         <div class="total-label">Total Bill</div>
@@ -139,7 +182,8 @@
         <div class="payment-methods-loading">Loading payment methods...</div>
       </div>
       <div class="payment-cash-message" id="payment-cash-message">
-        💵 You will pay at the restaurant counter.
+        <span class="msg-icon">💵</span>
+        <span>You will pay at the restaurant counter.</span>
       </div>
       <div class="payment-upi-details" id="payment-upi-details">
         <div class="upi-qr-wrap" id="upi-qr-wrap" style="display:none">
@@ -152,7 +196,7 @@
         </div>
         <button class="upi-pay-now-btn" id="upi-pay-now-btn">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-          Pay via UPI
+          Pay <span id="upi-pay-amount-label">₹0</span> via UPI
         </button>
       </div>
       <div class="payment-modal-footer" id="payment-selection-footer">
@@ -170,7 +214,7 @@
     </div>
   </div>
 
-  <!-- ═══════════ Toast ═══════════ -->
+  <!-- ═══════════ TOAST ═══════════ -->
   <div id="toast" class="toast" role="alert">
     <span id="toast-icon" class="toast-icon">✓</span>
     <span id="toast-message" class="toast-message"></span>
@@ -179,7 +223,7 @@
   <script>
     (function() {
       /* ═══════════════════════════════════════════════════════════
-         Hotel Menu – Dynamic Cart & Order System
+         The Grand Kitchen – Dynamic Menu & Order System
          ═══════════════════════════════════════════════════════════ */
 
       const TABLE_NUMBER = new URLSearchParams(window.location.search).get('table') || '';
@@ -195,15 +239,22 @@
       const cartCount = $('cart-count');
       const fabCount = $('cart-fab-count');
       const cartTotal = $('cart-total');
+      const cartSubtotal = $('cart-subtotal');
+      const cartItemCount = $('cart-item-count');
       const drawer = $('cart-drawer');
       const overlay = $('cart-overlay');
       const placeBtn = $('place-order-btn');
       const toast = $('toast');
       const toastMsg = $('toast-message');
       const toastIcon = $('toast-icon');
-  let toastTimer = null;
+      let toastTimer = null;
+      const searchInput = $('search-input');
+      const searchClear = $('search-clear');
+      const noResults = $('no-results');
+      const orderHistoryToast = $('order-history-toast');
+      const lastOrderInfo = $('last-order-info');
 
-      /* ——— Dynamic Greeting ——— */
+      /* ——— Greeting ——— */
       (function setGreeting() {
         const el = $('greeting');
         if (!el) return;
@@ -213,6 +264,32 @@
         else if (h < 17) g = 'Good Afternoon';
         el.textContent = '• ' + g;
       })();
+
+      /* ——— Search ——— */
+      searchInput.addEventListener('input', function() {
+        const q = this.value.toLowerCase().trim();
+        const cards = document.querySelectorAll('.menu-card');
+        let visible = 0;
+        cards.forEach(card => {
+          const name = card.dataset.itemName || '';
+          const match = !q || name.includes(q);
+          card.style.display = match ? '' : 'none';
+          if (match) visible++;
+        });
+        document.querySelectorAll('.category-section').forEach(section => {
+          const visibleCards = section.querySelectorAll('.menu-card[style*="display: none"]').length;
+          const totalCards = section.querySelectorAll('.menu-card').length;
+          section.style.display = (visibleCards === totalCards && totalCards > 0) ? 'none' : '';
+        });
+        noResults.style.display = visible === 0 ? '' : 'none';
+        searchClear.style.display = q ? '' : 'none';
+      });
+
+      searchClear.addEventListener('click', function() {
+        searchInput.value = '';
+        searchInput.dispatchEvent(new Event('input'));
+        searchInput.focus();
+      });
 
       /* ——— Cart Data ——— */
       function getCart() {
@@ -280,9 +357,7 @@
           const addBtn = $('add-btn-' + id);
           const qtyControl = $('card-qty-' + id);
           const qtyVal = $('card-qty-val-' + id);
-
           if (!addBtn || !qtyControl) return;
-
           if (qty > 0) {
             addBtn.style.display = 'none';
             qtyControl.style.display = 'flex';
@@ -308,12 +383,15 @@
               <span>Your cart is empty</span>
               <span class="empty-cart-hint">Tap <strong>Add</strong> on items to get started</span>
             </li>`;
+          cartSubtotal.textContent = '₹0.00';
+          cartItemCount.textContent = '0';
           cartTotal.textContent = '₹0.00';
           placeBtn.disabled = true;
           return;
         }
 
         placeBtn.disabled = false;
+        const subtotal = cart.reduce((s, i) => s + i.unit_price * i.quantity, 0);
 
         cartList.innerHTML = cart.map(i => `
           <li>
@@ -337,7 +415,9 @@
           </li>
         `).join('');
 
-        cartTotal.textContent = '₹' + cart.reduce((s, i) => s + i.unit_price * i.quantity, 0).toFixed(2);
+        cartSubtotal.textContent = '₹' + subtotal.toFixed(2);
+        cartItemCount.textContent = itemCount;
+        cartTotal.textContent = '₹' + subtotal.toFixed(2);
       }
 
       /* ——— Cart Drawer ——— */
@@ -353,7 +433,7 @@
         document.body.style.overflow = '';
       }
 
-      /* ——— FAB pulse ——— */
+      /* ——— FAB ——— */
       let fabPulseTimer = null;
       function fabPulse() {
         const fab = $('cart-fab');
@@ -424,9 +504,11 @@
       const upiIdValue = $('upi-id-value');
       const upiCopyBtn = $('upi-copy-btn');
       const upiPayNowBtn = $('upi-pay-now-btn');
+      const upiPayAmountLabel = $('upi-pay-amount-label');
       let upiPayAmount = 0;
       const confirmPaymentBtn = $('confirm-payment-btn');
       const paymentCancelBtn = $('payment-cancel-btn');
+      const paymentModalBack = $('payment-modal-back');
       const paymentSelectionFooter = $('payment-selection-footer');
       const paymentSuccessState = $('payment-success-state');
       const paymentModalHeader = paymentModal.querySelector('.payment-modal-header');
@@ -455,12 +537,8 @@
       async function loadPaymentMethods() {
         try {
           const resp = await fetch(API_PAYMENT_METHODS_URL);
-          if (resp.ok) {
-            paymentMethods = await resp.json();
-          }
-        } catch (e) {
-          paymentMethods = [];
-        }
+          if (resp.ok) { paymentMethods = await resp.json(); }
+        } catch (e) { paymentMethods = []; }
       }
 
       function openPaymentModal(total) {
@@ -477,9 +555,7 @@
 
         if (paymentMethods.length === 0) {
           paymentMethodsList.innerHTML = '<div class="payment-methods-loading">Loading payment methods...</div>';
-          loadPaymentMethods().then(() => {
-            renderPaymentMethods();
-          });
+          loadPaymentMethods().then(() => renderPaymentMethods());
         } else {
           renderPaymentMethods();
         }
@@ -493,6 +569,11 @@
         selectedPaymentMethod = null;
       }
 
+      function getPaymentIcon(code) {
+        const icons = { cash: '💵', upi: '📱', card: '💳', netbanking: '🏦' };
+        return icons[code] || '💳';
+      }
+
       function renderPaymentMethods() {
         if (paymentMethods.length === 0) {
           paymentMethodsList.innerHTML = '<div class="payment-error">No payment methods available.</div>';
@@ -503,6 +584,7 @@
           <label class="payment-method-option" data-code="${pm.code}">
             <input type="radio" name="payment_method" value="${pm.code}" />
             <span class="payment-method-radio"></span>
+            <span class="payment-method-icon">${getPaymentIcon(pm.code)}</span>
             <span class="payment-method-info">
               <span class="payment-method-name">${pm.name}</span>
               ${pm.description ? `<span class="payment-method-desc">${pm.description}</span>` : ''}
@@ -530,17 +612,12 @@
             } else if (code === 'upi') {
               const pm = paymentMethods.find(p => p.code === 'upi');
               if (pm) {
-                if (pm.upi_qr_code) {
-                  upiQrImg.src = pm.upi_qr_code;
-                  upiQrWrap.style.display = 'block';
-                }
-                if (pm.upi_id) {
-                  upiIdValue.textContent = pm.upi_id;
-                  upiIdDisplay.style.display = 'flex';
-                }
+                if (pm.upi_qr_code) { upiQrImg.src = pm.upi_qr_code; upiQrWrap.style.display = 'block'; }
+                if (pm.upi_id) { upiIdValue.textContent = pm.upi_id; upiIdDisplay.style.display = 'flex'; }
                 paymentUpiDetails.classList.add('show');
                 const total = getCart().reduce((s, i) => s + i.unit_price * i.quantity, 0);
                 upiPayAmount = total;
+                upiPayAmountLabel.textContent = '₹' + total.toFixed(2);
                 confirmPaymentBtn.style.display = 'none';
                 upiPayNowBtn.style.display = 'flex';
               }
@@ -577,64 +654,12 @@
             });
           } else {
             const ta = document.createElement('textarea');
-            ta.value = id;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            document.body.removeChild(ta);
+            ta.value = id; document.body.appendChild(ta); ta.select();
+            document.execCommand('copy'); document.body.removeChild(ta);
             upiCopyBtn.textContent = 'Copied!';
             setTimeout(() => { upiCopyBtn.textContent = 'Copy'; }, 2000);
           }
         });
-      }
-
-      async function submitOrderWithPayment() {
-        const cart = getCart();
-        if (cart.length === 0) return null;
-        if (!TABLE_NUMBER) {
-          showToast('Table number not found. Please scan the QR code.', 'check');
-          return null;
-        }
-
-        confirmPaymentBtn.disabled = true;
-        confirmPaymentBtn.classList.add('loading');
-
-        try {
-          const body = {
-            table_number: parseInt(TABLE_NUMBER, 10),
-            note: '',
-            items: cart
-          };
-          if (selectedPaymentMethod) {
-            body.payment_method_code = selectedPaymentMethod;
-          }
-
-          const resp = await fetch(API_ORDER_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-            body: JSON.stringify(body)
-          });
-          const data = await resp.json();
-          if (resp.ok && data.success) {
-            const pmName = data.payment_method ? data.payment_method.name : 'Not selected';
-            showPaymentSuccess(data.order_id, data.total, pmName, data.payment_method);
-            localStorage.removeItem(STORAGE_KEY);
-            renderCart();
-            syncCardQuantities();
-            closeCart();
-            return data;
-          } else {
-            showToast('Order failed. Please try again.', 'check');
-            confirmPaymentBtn.disabled = false;
-            confirmPaymentBtn.classList.remove('loading');
-            return null;
-          }
-        } catch (err) {
-          showToast('Network error. Please check your connection.', 'check');
-          confirmPaymentBtn.disabled = false;
-          confirmPaymentBtn.classList.remove('loading');
-          return null;
-        }
       }
 
       function showPaymentSuccess(orderId, total, pmName, pmData) {
@@ -645,51 +670,38 @@
           <h3>Order Placed!</h3>
           <p>Your order has been sent to the kitchen.</p>
           <div class="order-summary">
-            <div class="order-summary-row">
-              <span class="label">Order ID</span>
-              <span class="value">${orderId}</span>
-            </div>
-            <div class="order-summary-row">
-              <span class="label">Total</span>
-              <span class="value">₹${total}</span>
-            </div>
-            <div class="order-summary-row">
-              <span class="label">Payment</span>
-              <span class="value">${pmName}</span>
-            </div>
+            <div class="order-summary-row"><span class="label">Order ID</span><span class="value">${orderId}</span></div>
+            <div class="order-summary-row"><span class="label">Total</span><span class="value">₹${total}</span></div>
+            <div class="order-summary-row"><span class="label">Payment</span><span class="value">${pmName}</span></div>
           </div>
-          ${isCash ? '<p style="color:var(--gold);font-size:0.9rem;margin-top:0.5rem">💵 Please pay at the restaurant counter.</p>' : ''}
-          ${isUpi ? '<p style="color:var(--gold);font-size:0.9rem;margin-top:0.5rem">📱 Complete payment in your UPI app.</p>' : ''}
-          <button id="payment-done-btn" style="margin-top:0.5rem;padding:0.75rem 2rem;background:var(--gradient);color:#fff;border:none;border-radius:var(--radius-sm);font-size:0.9rem;font-weight:600;cursor:pointer">Done</button>
-          <button id="order-again-btn" style="margin-top:0.4rem;padding:0.6rem 2rem;background:none;color:var(--text-secondary);border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius-sm);font-size:0.85rem;font-weight:500;cursor:pointer">Order More</button>
+          ${isCash ? '<p class="success-note">💵 Please pay at the restaurant counter.</p>' : ''}
+          ${isUpi ? '<p class="success-note">📱 Complete payment in your UPI app.</p>' : ''}
+          <div class="success-actions">
+            <button id="payment-done-btn">Done</button>
+            <button id="order-again-btn" class="btn-secondary">Order More</button>
+          </div>
         `;
         showPaymentSuccessView();
         $('payment-done-btn').addEventListener('click', closePaymentModal);
         $('order-again-btn').addEventListener('click', closePaymentModal);
+
+        lastOrderInfo.textContent = `Order ${orderId} — ₹${total}`;
+        orderHistoryToast.style.display = 'flex';
       }
 
-      /* ——— Place Order (returns data or null) ——— */
+      /* ——— Place Order ——— */
       async function placeOrder() {
         const cart = getCart();
         if (cart.length === 0) return null;
-        if (!TABLE_NUMBER) {
-          showToast('Table number not found. Please scan the QR code.', 'check');
-          return null;
-        }
+        if (!TABLE_NUMBER) { showToast('Table number not found.', 'check'); return null; }
 
         const btn = selectedPaymentMethod === 'upi' ? upiPayNowBtn : confirmPaymentBtn;
         btn.disabled = true;
         btn.classList.add('loading');
 
         try {
-          const body = {
-            table_number: parseInt(TABLE_NUMBER, 10),
-            note: '',
-            items: cart
-          };
-          if (selectedPaymentMethod) {
-            body.payment_method_code = selectedPaymentMethod;
-          }
+          const body = { table_number: parseInt(TABLE_NUMBER, 10), note: '', items: cart };
+          if (selectedPaymentMethod) body.payment_method_code = selectedPaymentMethod;
 
           const resp = await fetch(API_ORDER_URL, {
             method: 'POST',
@@ -725,11 +737,11 @@
         tab.classList.add('active');
         const target = document.getElementById(tab.dataset.target);
         if (target) {
-          const navEl = $('categoryNav');
           const heroEl = $('hero');
-          const navH = navEl ? navEl.offsetHeight : 0;
+          const stickyEl = document.querySelector('.sticky-bar');
           const heroH = heroEl ? heroEl.offsetHeight : 0;
-          const top = target.getBoundingClientRect().top + window.scrollY - heroH - navH - 8;
+          const stickyH = stickyEl ? stickyEl.offsetHeight : 0;
+          const top = target.getBoundingClientRect().top + window.scrollY - heroH - stickyH + 8;
           window.scrollTo({ top, behavior: 'smooth' });
         }
       }
@@ -740,76 +752,54 @@
         syncCardQuantities();
         revealCards();
 
-        /* Category tabs click */
         document.querySelectorAll('.cat-tab').forEach(tab => {
           tab.addEventListener('click', () => activateTab(tab));
         });
 
-        /* Intersection Observer for tab highlighting */
         const sections = document.querySelectorAll('.category-section');
         const tabs = document.querySelectorAll('.cat-tab');
         if (sections.length && tabs.length) {
           const observer = new IntersectionObserver(entries => {
             entries.forEach(entry => {
               if (entry.isIntersecting) {
-                tabs.forEach(t => {
-                  t.classList.toggle('active', t.dataset.target === entry.target.id);
-                });
+                tabs.forEach(t => t.classList.toggle('active', t.dataset.target === entry.target.id));
               }
             });
           }, { rootMargin: '-80px 0px -55% 0px' });
           sections.forEach(s => observer.observe(s));
         }
 
-        /* Add to Cart buttons */
         document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
           btn.addEventListener('click', function() {
             const card = this.closest('.menu-card');
-            addToCart(
-              parseInt(card.dataset.itemId, 10),
-              card.dataset.itemName,
-              card.dataset.itemPrice
-            );
+            addToCart(parseInt(card.dataset.itemId, 10), card.dataset.itemName, card.dataset.itemPrice);
           });
         });
 
-        /* Card quantity +/- buttons (delegated on body for all category grids) */
         document.body.addEventListener('click', function(e) {
           const btn = e.target.closest('.card-qty-btn');
-          if (!btn) return;
-          if (!btn.closest('.menu-card')) return;
+          if (!btn || !btn.closest('.menu-card')) return;
           const id = parseInt(btn.dataset.id, 10);
           if (!id) return;
           const card = btn.closest('.menu-card');
           const name = card.dataset.itemName;
           const price = card.dataset.itemPrice;
-
           if (btn.classList.contains('card-qty-plus')) {
             const cart = getCart();
             const existing = cart.find(i => i.menu_item_id === id);
-            if (existing) {
-              updateQuantity(id, 1);
-            } else {
-              addToCart(id, name, price);
-            }
+            existing ? updateQuantity(id, 1) : addToCart(id, name, price);
           } else if (btn.classList.contains('card-qty-minus')) {
             const cart = getCart();
             const existing = cart.find(i => i.menu_item_id === id);
-            if (existing && existing.quantity <= 1) {
-              removeFromCart(id);
-            } else {
-              updateQuantity(id, -1);
-            }
+            existing && existing.quantity <= 1 ? removeFromCart(id) : updateQuantity(id, -1);
           }
         });
 
-        /* Cart drawer controls */
         $('cart-fab').addEventListener('click', openCart);
         $('cart-close-btn').addEventListener('click', closeCart);
         overlay.addEventListener('click', closeCart);
         $('clear-cart-btn').addEventListener('click', clearCart);
 
-        /* Cart item controls (delegated) */
         cartList.addEventListener('click', function(e) {
           const target = e.target.closest('[data-id]');
           if (!target) return;
@@ -822,17 +812,25 @@
           }
         });
 
-        /* Place Order */
-        placeBtn.addEventListener('click', placeOrder);
+        placeBtn.addEventListener('click', function() {
+          const cart = getCart();
+          if (cart.length === 0 || placeBtn.disabled) return;
+          if (!TABLE_NUMBER) { showToast('Table number not found.', 'check'); return; }
+          const total = cart.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+          openPaymentModal(total);
+        });
 
-        /* Payment Modal */
-        confirmPaymentBtn.addEventListener('click', submitOrderWithPayment);
+        confirmPaymentBtn.addEventListener('click', placeOrder);
         paymentCancelBtn.addEventListener('click', closePaymentModal);
+        paymentModalBack.addEventListener('click', closePaymentModal);
         paymentOverlay.addEventListener('click', function(e) {
           if (e.target === paymentOverlay) closePaymentModal();
         });
 
-        /* Load payment methods on page load */
+        orderHistoryToast.addEventListener('click', function() {
+          this.style.display = 'none';
+        });
+
         loadPaymentMethods();
       });
 
