@@ -21,8 +21,11 @@ class TableAdmin(admin.ModelAdmin):
     readonly_fields = ["qr_code"]
 
     def qr_code_preview(self, obj):
-        if obj.qr_code:
-            return f'<img src="{obj.qr_code.url}" width="100" height="100" />'
+        try:
+            if obj.qr_code and obj.qr_code.storage.exists(obj.qr_code.name):
+                return f'<img src="{obj.qr_code.url}" width="100" height="100" />'
+        except Exception:
+            pass
         return "—"
 
     qr_code_preview.allow_tags = True
