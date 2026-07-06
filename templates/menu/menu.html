@@ -11,29 +11,28 @@
 
   <!-- ═══════════ HERO ═══════════ -->
   <header class="hero" id="hero">
-    <div class="hero-bg-shapes"></div>
-    <div class="hero-content">
-      <div class="hero-brand-row">
-        <div class="hero-icon">🍽️</div>
-        <div>
-          <div class="hero-brand">{{ restaurant_name }} <span>{{ restaurant_suffix }}</span></div>
-          <div class="hero-tagline">Fine Dining • Digital Menu</div>
-        </div>
-      </div>
-      <div class="hero-meta">
-        <span class="table-badge">📍 Table {{ table_number }}</span>
+    <div class="hero-inner">
+      <div class="hero-brand">{{ restaurant_name }} <span>{{ restaurant_suffix }}</span></div>
+      <div class="hero-meta-row">
+        <span class="table-badge">Table {{ table_number }}</span>
         <span class="greeting" id="greeting"></span>
+      </div>
+      <div class="theme-picker" id="themePicker">
+        <button class="theme-picker-toggle" id="themePickerToggle" aria-label="Change theme">🎨</button>
+        <div class="theme-palette" id="themePalette">
+          <button class="theme-option active" data-theme="rose" style="--theme-color:#f857a6" aria-label="Rose"></button>
+          <button class="theme-option" data-theme="emerald" style="--theme-color:#10b981" aria-label="Emerald"></button>
+          <button class="theme-option" data-theme="ocean" style="--theme-color:#3b82f6" aria-label="Ocean"></button>
+          <button class="theme-option" data-theme="amber" style="--theme-color:#f59e0b" aria-label="Amber"></button>
+          <button class="theme-option" data-theme="purple" style="--theme-color:#8b5cf6" aria-label="Purple"></button>
+          <button class="theme-option" data-theme="slate" style="--theme-color:#64748b" aria-label="Slate"></button>
+        </div>
       </div>
     </div>
   </header>
 
-  <!-- ═══════════ SEARCH + CATEGORY NAV ═══════════ -->
+  <!-- ═══════════ CATEGORY NAV ═══════════ -->
   <div class="sticky-bar">
-    <div class="search-wrap">
-      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-      <input type="text" id="search-input" class="search-input" placeholder="Search menu items..." autocomplete="off" />
-      <button class="search-clear" id="search-clear" aria-label="Clear search">&times;</button>
-    </div>
     <nav class="category-nav" id="categoryNav">
       {% for category in categories %}
         <button class="cat-tab{% if forloop.first %} active{% endif %}" data-target="cat-{{ category.id }}">
@@ -99,11 +98,6 @@
         <p>Menu is being updated. Please check back later.</p>
       </div>
     {% endfor %}
-    <div class="no-results" id="no-results" style="display:none">
-      <span class="empty-icon">🔍</span>
-      <h3>No items found</h3>
-      <p>Try a different search term.</p>
-    </div>
   </main>
 
   <!-- ═══════════ ORDER HISTORY BADGE ═══════════ -->
@@ -248,9 +242,6 @@
       const toastMsg = $('toast-message');
       const toastIcon = $('toast-icon');
       let toastTimer = null;
-      const searchInput = $('search-input');
-      const searchClear = $('search-clear');
-      const noResults = $('no-results');
       const orderHistoryToast = $('order-history-toast');
       const lastOrderInfo = $('last-order-info');
 
@@ -265,31 +256,32 @@
         el.textContent = '• ' + g;
       })();
 
-      /* ——— Search ——— */
-      searchInput.addEventListener('input', function() {
-        const q = this.value.toLowerCase().trim();
-        const cards = document.querySelectorAll('.menu-card');
-        let visible = 0;
-        cards.forEach(card => {
-          const name = card.dataset.itemName || '';
-          const match = !q || name.includes(q);
-          card.style.display = match ? '' : 'none';
-          if (match) visible++;
+      /* ——— Theme Switcher ——— */
+      (function initTheme() {
+        const saved = localStorage.getItem('hotel_theme') || 'rose';
+        document.documentElement.setAttribute('data-theme', saved);
+        const palette = $('themePalette');
+        const toggle = $('themePickerToggle');
+        if (!palette || !toggle) return;
+        palette.querySelectorAll('.theme-option').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.theme === saved);
+          btn.addEventListener('click', function() {
+            const theme = this.dataset.theme;
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('hotel_theme', theme);
+            palette.querySelectorAll('.theme-option').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            palette.classList.remove('open');
+          });
         });
-        document.querySelectorAll('.category-section').forEach(section => {
-          const visibleCards = section.querySelectorAll('.menu-card[style*="display: none"]').length;
-          const totalCards = section.querySelectorAll('.menu-card').length;
-          section.style.display = (visibleCards === totalCards && totalCards > 0) ? 'none' : '';
+        toggle.addEventListener('click', function(e) {
+          e.stopPropagation();
+          palette.classList.toggle('open');
         });
-        noResults.style.display = visible === 0 ? '' : 'none';
-        searchClear.style.display = q ? '' : 'none';
-      });
-
-      searchClear.addEventListener('click', function() {
-        searchInput.value = '';
-        searchInput.dispatchEvent(new Event('input'));
-        searchInput.focus();
-      });
+        document.addEventListener('click', function(e) {
+          if (!e.target.closest('.theme-picker')) palette.classList.remove('open');
+        });
+      })();
 
       /* ——— Cart Data ——— */
       function getCart() {
