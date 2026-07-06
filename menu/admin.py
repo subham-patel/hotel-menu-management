@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.template.response import TemplateResponse
 from .models import Category, MenuItem, Table, Order, OrderItem
 
 
@@ -47,3 +48,14 @@ class OrderAdmin(admin.ModelAdmin):
     list_editable = ["status"]
     inlines = [OrderItemInline]
     readonly_fields = ["order_id", "total"]
+
+    def changelist_view(self, request, extra_context=None):
+        resp = super().changelist_view(request, extra_context)
+        if isinstance(resp, TemplateResponse):
+            resp.add_post_render_callback(
+                lambda r: r.content.replace(
+                    b"</head>",
+                    b'<meta http-equiv="refresh" content="10"></head>',
+                )
+            )
+        return resp
