@@ -60,6 +60,22 @@ class Table(models.Model):
         self.save(update_fields=["qr_code"])
 
 
+class PaymentMethod(models.Model):
+    name = models.CharField(max_length=100)
+    code = models.SlugField(max_length=50, unique=True, help_text="Unique identifier (e.g., 'cash', 'card', 'upi')")
+    description = models.TextField(blank=True)
+    upi_id = models.CharField(max_length=100, blank=True, help_text="UPI ID (e.g., restaurant@upi)")
+    upi_qr_code = models.ImageField(upload_to="upi_qr_codes/", blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class Order(models.Model):
     STATUS_CHOICES = [
         ("pending", "Pending"),
@@ -76,6 +92,9 @@ class Order(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     note = models.TextField(blank=True)
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    payment_method = models.ForeignKey(
+        PaymentMethod, on_delete=models.SET_NULL, null=True, blank=True, related_name="orders"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

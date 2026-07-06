@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.safestring import mark_safe
-from .models import Category, MenuItem, Table, Order, OrderItem
+from .models import Category, MenuItem, Table, Order, OrderItem, PaymentMethod
 
 
 @admin.register(Category)
@@ -32,6 +32,24 @@ class TableAdmin(admin.ModelAdmin):
     qr_code_preview.short_description = "QR Code"
 
 
+@admin.register(PaymentMethod)
+class PaymentMethodAdmin(admin.ModelAdmin):
+    list_display = ["name", "code", "upi_id", "is_active", "created_at"]
+    list_editable = ["is_active"]
+    prepopulated_fields = {"code": ("name",)}
+    fieldsets = [
+        (None, {"fields": ["name", "code", "description", "is_active"]}),
+        ("UPI Settings", {
+            "fields": ["upi_id", "upi_qr_code"],
+            "classes": ["collapse"],
+            "description": "Configure UPI payment details. Only applicable if this is a UPI payment method.",
+        }),
+    ]
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+
+
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
@@ -44,10 +62,11 @@ class OrderAdmin(admin.ModelAdmin):
         "order_id",
         "table",
         "status",
+        "payment_method",
         "total",
         "created_at",
     ]
-    list_filter = ["status", "created_at"]
+    list_filter = ["status", "payment_method", "created_at"]
     list_editable = ["status"]
     inlines = [OrderItemInline]
     readonly_fields = ["order_id", "total"]

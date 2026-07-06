@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, MenuItem, Table, Order, OrderItem
+from .models import Category, MenuItem, Table, Order, OrderItem, PaymentMethod
 
 
 class MenuItemSerializer(serializers.ModelSerializer):
@@ -22,8 +22,15 @@ class OrderItemSerializer(serializers.ModelSerializer):
         fields = ["id", "menu_item", "item_name", "quantity", "unit_price"]
 
 
+class PaymentMethodSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentMethod
+        fields = ["id", "name", "code", "description", "upi_id", "upi_qr_code"]
+
+
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
+    payment_method = PaymentMethodSerializer(read_only=True)
 
     class Meta:
         model = Order
@@ -35,6 +42,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "note",
             "total",
             "items",
+            "payment_method",
             "created_at",
         ]
 
@@ -50,18 +58,30 @@ class CreateOrderSerializer(serializers.Serializer):
     table_number = serializers.IntegerField()
     note = serializers.CharField(required=False, allow_blank=True)
     items = CreateOrderItemSerializer(many=True)
+    payment_method_code = serializers.CharField(required=False, allow_blank=True)
 
     def validate_table_number(self, value):
         if not Table.objects.filter(number=value).exists():
             raise serializers.ValidationError(f"Table {value} does not exist.")
         return value
 
+    def validate_payment_method_code(self, value):
+        if value:
+            if not PaymentMethod.objects.filter(code=value, is_active=True).exists():
+                raise serializers.ValidationError(f"Payment method '{value}' is not available.")
+        return value
+
     def create(self, validated_data):
         table = Table.objects.get(number=validated_data["table_number"])
         items_data = validated_data.pop("items")
         note = validated_data.pop("note", "")
+        payment_method_code = validated_data.pop("payment_method_code", None)
 
-        order = Order.objects.create(table=table, note=note)
+        payment_method = None
+        if payment_method_code:
+            payment_method = PaymentMethod.objects.get(code=payment_method_code)
+
+        order = Order.objects.create(table=table, note=note, payment_method=payment_method)
 
         total = 0
         order_items = []

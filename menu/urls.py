@@ -14,8 +14,18 @@ urlpatterns = [
         name="api_menu_items",
     ),
     path(
+        "api/payment-methods/",
+        views.PaymentMethodListAPIView.as_view(),
+        name="api_payment_methods",
+    ),
+    path(
         "api/place-order/",
         views.PlaceOrderAPIView.as_view(),
         name="api_place_order",
+    ),
+    path(
+        "api/orders/<str:order_id>/payment-method/",
+        views.UpdateOrderPaymentMethodAPIView.as_view(),
+        name="api_update_payment_method",
     ),
 ]

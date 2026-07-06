@@ -124,6 +124,48 @@
     </div>
   </aside>
 
+  <!-- ═══════════ Payment Overlay ═══════════ -->
+  <div id="payment-overlay">
+    <div id="payment-modal">
+      <div class="payment-modal-header">
+        <h2>Select Payment Method</h2>
+        <p>Choose how you'd like to pay</p>
+      </div>
+      <div class="payment-total-display">
+        <div class="total-label">Total Bill</div>
+        <div class="total-amount" id="payment-total">₹0.00</div>
+      </div>
+      <div class="payment-methods-list" id="payment-methods-list">
+        <div class="payment-methods-loading">Loading payment methods...</div>
+      </div>
+      <div class="payment-cash-message" id="payment-cash-message">
+        💵 You will pay at the restaurant counter.
+      </div>
+      <div class="payment-upi-details" id="payment-upi-details">
+        <div class="upi-qr-wrap" id="upi-qr-wrap" style="display:none">
+          <img id="upi-qr-img" src="" alt="UPI QR Code" />
+        </div>
+        <div class="upi-id-display" id="upi-id-display" style="display:none">
+          <span class="upi-id-label">UPI ID</span>
+          <span class="upi-id-value" id="upi-id-value"></span>
+          <button class="upi-copy-btn" id="upi-copy-btn">Copy</button>
+        </div>
+        <p class="upi-pay-hint">💳 Pay using any UPI app (Google Pay, PhonePe, Paytm)</p>
+      </div>
+      <div class="payment-modal-footer">
+        <button id="confirm-payment-btn" disabled>
+          <span class="btn-text">Place Order</span>
+          <span class="btn-spinner">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <circle cx="12" cy="12" r="10" stroke-dasharray="31.4 31.4" stroke-linecap="round"/>
+            </svg>
+          </span>
+        </button>
+        <button id="payment-cancel-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══════════ Toast ═══════════ -->
   <div id="toast" class="toast" role="alert">
     <span id="toast-icon" class="toast-icon">✓</span>
@@ -138,6 +180,7 @@
 
       const TABLE_NUMBER = new URLSearchParams(window.location.search).get('table') || '';
       const API_ORDER_URL = "{% url 'api_place_order' %}";
+      const API_PAYMENT_METHODS_URL = "{% url 'api_payment_methods' %}";
       const CSRF_TOKEN = "{{ csrf_token }}";
       const STORAGE_KEY = 'hotel_cart';
 
@@ -361,42 +404,216 @@
         cards.forEach(c => observer.observe(c));
       }
 
+      /* ——— Payment Modal ——— */
+      let selectedPaymentMethod = null;
+      let paymentMethods = [];
+      const paymentOverlay = $('payment-overlay');
+      const paymentModal = $('payment-modal');
+      const paymentTotal = $('payment-total');
+      const paymentMethodsList = $('payment-methods-list');
+      const paymentCashMsg = $('payment-cash-message');
+      const paymentUpiDetails = $('payment-upi-details');
+      const upiQrWrap = $('upi-qr-wrap');
+      const upiQrImg = $('upi-qr-img');
+      const upiIdDisplay = $('upi-id-display');
+      const upiIdValue = $('upi-id-value');
+      const upiCopyBtn = $('upi-copy-btn');
+      const confirmPaymentBtn = $('confirm-payment-btn');
+      const paymentCancelBtn = $('payment-cancel-btn');
+
+      async function loadPaymentMethods() {
+        try {
+          const resp = await fetch(API_PAYMENT_METHODS_URL);
+          if (resp.ok) {
+            paymentMethods = await resp.json();
+          }
+        } catch (e) {
+          paymentMethods = [];
+        }
+      }
+
+      function openPaymentModal(total) {
+        paymentTotal.textContent = '₹' + total.toFixed(2);
+        selectedPaymentMethod = null;
+        paymentCashMsg.classList.remove('show');
+        paymentUpiDetails.classList.remove('show');
+        upiQrWrap.style.display = 'none';
+        upiIdDisplay.style.display = 'none';
+        confirmPaymentBtn.disabled = true;
+        confirmPaymentBtn.classList.remove('loading');
+        confirmPaymentBtn.querySelector('.btn-text').textContent = 'Place Order';
+
+        if (paymentMethods.length === 0) {
+          paymentMethodsList.innerHTML = '<div class="payment-methods-loading">Loading payment methods...</div>';
+          loadPaymentMethods().then(() => {
+            renderPaymentMethods();
+          });
+        } else {
+          renderPaymentMethods();
+        }
+
+        paymentOverlay.classList.add('open');
+      }
+
+      function closePaymentModal() {
+        paymentOverlay.classList.remove('open');
+        selectedPaymentMethod = null;
+      }
+
+      function renderPaymentMethods() {
+        if (paymentMethods.length === 0) {
+          paymentMethodsList.innerHTML = '<div class="payment-error">No payment methods available.</div>';
+          return;
+        }
+
+        paymentMethodsList.innerHTML = paymentMethods.map(pm => `
+          <label class="payment-method-option" data-code="${pm.code}">
+            <input type="radio" name="payment_method" value="${pm.code}" />
+            <span class="payment-method-radio"></span>
+            <span class="payment-method-info">
+              <span class="payment-method-name">${pm.name}</span>
+              ${pm.description ? `<span class="payment-method-desc">${pm.description}</span>` : ''}
+            </span>
+          </label>
+        `).join('');
+
+        paymentMethodsList.querySelectorAll('.payment-method-option').forEach(el => {
+          el.addEventListener('click', function() {
+            paymentMethodsList.querySelectorAll('.payment-method-option').forEach(o => o.classList.remove('selected'));
+            this.classList.add('selected');
+            const code = this.dataset.code;
+            selectedPaymentMethod = code;
+            confirmPaymentBtn.disabled = false;
+
+            paymentCashMsg.classList.remove('show');
+            paymentUpiDetails.classList.remove('show');
+            upiQrWrap.style.display = 'none';
+            upiIdDisplay.style.display = 'none';
+
+            if (code === 'cash') {
+              paymentCashMsg.classList.add('show');
+            } else if (code === 'upi') {
+              const pm = paymentMethods.find(p => p.code === 'upi');
+              if (pm) {
+                if (pm.upi_qr_code) {
+                  upiQrImg.src = pm.upi_qr_code;
+                  upiQrWrap.style.display = 'block';
+                }
+                if (pm.upi_id) {
+                  upiIdValue.textContent = pm.upi_id;
+                  upiIdDisplay.style.display = 'flex';
+                }
+                paymentUpiDetails.classList.add('show');
+              }
+            }
+          });
+        });
+
+        upiCopyBtn.addEventListener('click', function() {
+          const id = upiIdValue.textContent;
+          if (!id) return;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(id).then(() => {
+              upiCopyBtn.textContent = 'Copied!';
+              setTimeout(() => { upiCopyBtn.textContent = 'Copy'; }, 2000);
+            });
+          } else {
+            const ta = document.createElement('textarea');
+            ta.value = id;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            upiCopyBtn.textContent = 'Copied!';
+            setTimeout(() => { upiCopyBtn.textContent = 'Copy'; }, 2000);
+          }
+        });
+      }
+
+      async function submitOrderWithPayment() {
+        const cart = getCart();
+        if (cart.length === 0) return;
+        if (!TABLE_NUMBER) {
+          showToast('Table number not found. Please scan the QR code.', 'check');
+          return;
+        }
+
+        confirmPaymentBtn.disabled = true;
+        confirmPaymentBtn.classList.add('loading');
+
+        try {
+          const body = {
+            table_number: parseInt(TABLE_NUMBER, 10),
+            note: '',
+            items: cart
+          };
+          if (selectedPaymentMethod) {
+            body.payment_method_code = selectedPaymentMethod;
+          }
+
+          const resp = await fetch(API_ORDER_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify(body)
+          });
+          const data = await resp.json();
+          if (resp.ok && data.success) {
+            const pmName = data.payment_method ? data.payment_method.name : 'Not selected';
+            showPaymentSuccess(data.order_id, data.total, pmName);
+            localStorage.removeItem(STORAGE_KEY);
+            renderCart();
+            syncCardQuantities();
+            closeCart();
+          } else {
+            showToast('Order failed. Please try again.', 'check');
+            confirmPaymentBtn.disabled = false;
+            confirmPaymentBtn.classList.remove('loading');
+          }
+        } catch (err) {
+          showToast('Network error. Please check your connection.', 'check');
+          confirmPaymentBtn.disabled = false;
+          confirmPaymentBtn.classList.remove('loading');
+        }
+      }
+
+      function showPaymentSuccess(orderId, total, pmName) {
+        const isCash = pmName.toLowerCase().includes('cash');
+        paymentModal.innerHTML = `
+          <div class="payment-success-state">
+            <div class="success-icon">${isCash ? '💵' : '✅'}</div>
+            <h3>Order Placed!</h3>
+            <p>Your order has been sent to the kitchen.</p>
+            <div class="order-summary">
+              <div class="order-summary-row">
+                <span class="label">Order ID</span>
+                <span class="value">${orderId}</span>
+              </div>
+              <div class="order-summary-row">
+                <span class="label">Total</span>
+                <span class="value">₹${total}</span>
+              </div>
+              <div class="order-summary-row">
+                <span class="label">Payment</span>
+                <span class="value">${pmName}</span>
+              </div>
+            </div>
+            ${isCash ? '<p style="color: var(--gold); font-size: 0.9rem; margin-top: 0.5rem;">💵 Please pay at the restaurant counter.</p>' : ''}
+            <button id="payment-done-btn">Done</button>
+          </div>
+        `;
+        $('payment-done-btn').addEventListener('click', closePaymentModal);
+      }
+
       /* ——— Place Order ——— */
-      async function placeOrder() {
+      function placeOrder() {
         const cart = getCart();
         if (cart.length === 0 || placeBtn.disabled) return;
         if (!TABLE_NUMBER) {
           showToast('Table number not found. Please scan the QR code.', 'check');
           return;
         }
-        if (!confirm('Are you sure you want to place this order?')) return;
-
-        placeBtn.disabled = true;
-        placeBtn.classList.add('loading');
-
-        try {
-          const resp = await fetch(API_ORDER_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-            body: JSON.stringify({ table_number: parseInt(TABLE_NUMBER, 10), note: '', items: cart })
-          });
-          const data = await resp.json();
-          if (resp.ok && data.success) {
-            showToast(`Order ${data.order_id} placed! Total: ₹${data.total}`, 'check');
-            localStorage.removeItem(STORAGE_KEY);
-            renderCart();
-            syncCardQuantities();
-            setTimeout(closeCart, 1200);
-          } else {
-            showToast('Order failed. Please try again.', 'check');
-            placeBtn.disabled = false;
-            placeBtn.classList.remove('loading');
-          }
-        } catch (err) {
-          showToast('Network error. Please check your connection.', 'check');
-          placeBtn.disabled = false;
-          placeBtn.classList.remove('loading');
-        }
+        const total = cart.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+        openPaymentModal(total);
       }
 
       /* ——— Category Tabs ——— */
@@ -503,6 +720,16 @@
 
         /* Place Order */
         placeBtn.addEventListener('click', placeOrder);
+
+        /* Payment Modal */
+        confirmPaymentBtn.addEventListener('click', submitOrderWithPayment);
+        paymentCancelBtn.addEventListener('click', closePaymentModal);
+        paymentOverlay.addEventListener('click', function(e) {
+          if (e.target === paymentOverlay) closePaymentModal();
+        });
+
+        /* Load payment methods on page load */
+        loadPaymentMethods();
       });
 
     })();
