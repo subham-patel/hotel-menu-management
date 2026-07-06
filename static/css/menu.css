@@ -1171,3 +1171,35 @@ main {
   font-size: 0.78rem;
   color: var(--text-muted);
 }
+
+.upi-pay-now-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  background: #6c2bd9;
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.upi-pay-now-btn:hover {
+  background: #7c3cff;
+  box-shadow: 0 4px 20px rgba(108, 43, 217, 0.4);
+  transform: translateY(-2px);
+}
+
+.upi-pay-now-btn:active {
+  transform: scale(0.97);
+}
+
+.upi-pay-now-btn svg {
+  flex-shrink: 0;
+}

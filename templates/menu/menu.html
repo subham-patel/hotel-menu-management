@@ -150,7 +150,10 @@
           <span class="upi-id-value" id="upi-id-value"></span>
           <button class="upi-copy-btn" id="upi-copy-btn">Copy</button>
         </div>
-        <p class="upi-pay-hint">💳 Pay using any UPI app (Google Pay, PhonePe, Paytm)</p>
+        <button class="upi-pay-now-btn" id="upi-pay-now-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          Pay via UPI
+        </button>
       </div>
       <div class="payment-modal-footer">
         <button id="confirm-payment-btn" disabled>
@@ -183,6 +186,7 @@
       const API_PAYMENT_METHODS_URL = "{% url 'api_payment_methods' %}";
       const CSRF_TOKEN = "{{ csrf_token }}";
       const STORAGE_KEY = 'hotel_cart';
+      const RESTAURANT_NAME = "{{ restaurant_name }} {{ restaurant_suffix }}";
 
       /* ——— DOM refs ——— */
       const $ = id => document.getElementById(id);
@@ -418,6 +422,8 @@
       const upiIdDisplay = $('upi-id-display');
       const upiIdValue = $('upi-id-value');
       const upiCopyBtn = $('upi-copy-btn');
+      const upiPayNowBtn = $('upi-pay-now-btn');
+      let upiPayAmount = 0;
       const confirmPaymentBtn = $('confirm-payment-btn');
       const paymentCancelBtn = $('payment-cancel-btn');
 
@@ -504,9 +510,22 @@
                   upiIdDisplay.style.display = 'flex';
                 }
                 paymentUpiDetails.classList.add('show');
+                const total = getCart().reduce((s, i) => s + i.unit_price * i.quantity, 0);
+                upiPayAmount = total;
               }
             }
           });
+        });
+
+        upiPayNowBtn.addEventListener('click', function() {
+          const pm = paymentMethods.find(p => p.code === 'upi');
+          if (!pm || !pm.upi_id || upiPayAmount <= 0) return;
+          const upiUrl = 'upi://pay?pa=' + encodeURIComponent(pm.upi_id)
+            + '&pn=' + encodeURIComponent(RESTAURANT_NAME)
+            + '&am=' + upiPayAmount.toFixed(2)
+            + '&cu=INR'
+            + '&tn=' + encodeURIComponent('Payment for Table ' + TABLE_NUMBER);
+          window.location.href = upiUrl;
         });
 
         upiCopyBtn.addEventListener('click', function() {
