@@ -155,7 +155,7 @@
           Pay via UPI
         </button>
       </div>
-      <div class="payment-modal-footer">
+      <div class="payment-modal-footer" id="payment-selection-footer">
         <button id="confirm-payment-btn" disabled>
           <span class="btn-text">Place Order</span>
           <span class="btn-spinner">
@@ -166,6 +166,7 @@
         </button>
         <button id="payment-cancel-btn">Cancel</button>
       </div>
+      <div id="payment-success-state" class="payment-success-state" style="display:none"></div>
     </div>
   </div>
 
@@ -426,6 +427,30 @@
       let upiPayAmount = 0;
       const confirmPaymentBtn = $('confirm-payment-btn');
       const paymentCancelBtn = $('payment-cancel-btn');
+      const paymentSelectionFooter = $('payment-selection-footer');
+      const paymentSuccessState = $('payment-success-state');
+      const paymentModalHeader = paymentModal.querySelector('.payment-modal-header');
+      const paymentTotalDisplay = paymentModal.querySelector('.payment-total-display');
+
+      function showPaymentSelection() {
+        paymentModalHeader.style.display = '';
+        paymentTotalDisplay.style.display = '';
+        paymentMethodsList.style.display = '';
+        paymentCashMsg.classList.remove('show');
+        paymentUpiDetails.classList.remove('show');
+        paymentSelectionFooter.style.display = '';
+        paymentSuccessState.style.display = 'none';
+      }
+
+      function showPaymentSuccessView() {
+        paymentModalHeader.style.display = 'none';
+        paymentTotalDisplay.style.display = 'none';
+        paymentMethodsList.style.display = 'none';
+        paymentCashMsg.classList.remove('show');
+        paymentUpiDetails.classList.remove('show');
+        paymentSelectionFooter.style.display = 'none';
+        paymentSuccessState.style.display = '';
+      }
 
       async function loadPaymentMethods() {
         try {
@@ -439,12 +464,13 @@
       }
 
       function openPaymentModal(total) {
+        showPaymentSelection();
         paymentTotal.textContent = '₹' + total.toFixed(2);
         selectedPaymentMethod = null;
-        paymentCashMsg.classList.remove('show');
-        paymentUpiDetails.classList.remove('show');
-        upiQrWrap.style.display = 'none';
-        upiIdDisplay.style.display = 'none';
+        upiPayNowBtn.style.display = 'none';
+        upiPayNowBtn.disabled = false;
+        upiPayNowBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Pay via UPI';
+        confirmPaymentBtn.style.display = '';
         confirmPaymentBtn.disabled = true;
         confirmPaymentBtn.classList.remove('loading');
         confirmPaymentBtn.querySelector('.btn-text').textContent = 'Place Order';
@@ -463,6 +489,7 @@
 
       function closePaymentModal() {
         paymentOverlay.classList.remove('open');
+        showPaymentSelection();
         selectedPaymentMethod = null;
       }
 
@@ -495,6 +522,8 @@
             paymentUpiDetails.classList.remove('show');
             upiQrWrap.style.display = 'none';
             upiIdDisplay.style.display = 'none';
+            upiPayNowBtn.style.display = 'none';
+            confirmPaymentBtn.style.display = '';
 
             if (code === 'cash') {
               paymentCashMsg.classList.add('show');
@@ -512,20 +541,30 @@
                 paymentUpiDetails.classList.add('show');
                 const total = getCart().reduce((s, i) => s + i.unit_price * i.quantity, 0);
                 upiPayAmount = total;
+                confirmPaymentBtn.style.display = 'none';
+                upiPayNowBtn.style.display = 'flex';
               }
             }
           });
         });
 
-        upiPayNowBtn.addEventListener('click', function() {
+        upiPayNowBtn.addEventListener('click', async function() {
           const pm = paymentMethods.find(p => p.code === 'upi');
           if (!pm || !pm.upi_id || upiPayAmount <= 0) return;
-          const upiUrl = 'upi://pay?pa=' + encodeURIComponent(pm.upi_id)
-            + '&pn=' + encodeURIComponent(RESTAURANT_NAME)
-            + '&am=' + upiPayAmount.toFixed(2)
-            + '&cu=INR'
-            + '&tn=' + encodeURIComponent('Payment for Table ' + TABLE_NUMBER);
-          window.location.href = upiUrl;
+          upiPayNowBtn.disabled = true;
+          upiPayNowBtn.textContent = 'Placing order...';
+          const result = await placeOrder();
+          if (result) {
+            const upiUrl = 'upi://pay?pa=' + encodeURIComponent(pm.upi_id)
+              + '&pn=' + encodeURIComponent(RESTAURANT_NAME)
+              + '&am=' + upiPayAmount.toFixed(2)
+              + '&cu=INR'
+              + '&tn=' + encodeURIComponent('Order ' + result.order_id + ' - Table ' + TABLE_NUMBER);
+            window.location.href = upiUrl;
+          } else {
+            upiPayNowBtn.disabled = false;
+            upiPayNowBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Pay via UPI';
+          }
         });
 
         upiCopyBtn.addEventListener('click', function() {
@@ -551,10 +590,10 @@
 
       async function submitOrderWithPayment() {
         const cart = getCart();
-        if (cart.length === 0) return;
+        if (cart.length === 0) return null;
         if (!TABLE_NUMBER) {
           showToast('Table number not found. Please scan the QR code.', 'check');
-          return;
+          return null;
         }
 
         confirmPaymentBtn.disabled = true;
@@ -578,61 +617,106 @@
           const data = await resp.json();
           if (resp.ok && data.success) {
             const pmName = data.payment_method ? data.payment_method.name : 'Not selected';
-            showPaymentSuccess(data.order_id, data.total, pmName);
+            showPaymentSuccess(data.order_id, data.total, pmName, data.payment_method);
             localStorage.removeItem(STORAGE_KEY);
             renderCart();
             syncCardQuantities();
             closeCart();
+            return data;
           } else {
             showToast('Order failed. Please try again.', 'check');
             confirmPaymentBtn.disabled = false;
             confirmPaymentBtn.classList.remove('loading');
+            return null;
           }
         } catch (err) {
           showToast('Network error. Please check your connection.', 'check');
           confirmPaymentBtn.disabled = false;
           confirmPaymentBtn.classList.remove('loading');
+          return null;
         }
       }
 
-      function showPaymentSuccess(orderId, total, pmName) {
+      function showPaymentSuccess(orderId, total, pmName, pmData) {
         const isCash = pmName.toLowerCase().includes('cash');
-        paymentModal.innerHTML = `
-          <div class="payment-success-state">
-            <div class="success-icon">${isCash ? '💵' : '✅'}</div>
-            <h3>Order Placed!</h3>
-            <p>Your order has been sent to the kitchen.</p>
-            <div class="order-summary">
-              <div class="order-summary-row">
-                <span class="label">Order ID</span>
-                <span class="value">${orderId}</span>
-              </div>
-              <div class="order-summary-row">
-                <span class="label">Total</span>
-                <span class="value">₹${total}</span>
-              </div>
-              <div class="order-summary-row">
-                <span class="label">Payment</span>
-                <span class="value">${pmName}</span>
-              </div>
+        const isUpi = pmData && pmData.code === 'upi';
+        paymentSuccessState.innerHTML = `
+          <div class="success-icon">${isCash ? '💵' : isUpi ? '📱' : '✅'}</div>
+          <h3>Order Placed!</h3>
+          <p>Your order has been sent to the kitchen.</p>
+          <div class="order-summary">
+            <div class="order-summary-row">
+              <span class="label">Order ID</span>
+              <span class="value">${orderId}</span>
             </div>
-            ${isCash ? '<p style="color: var(--gold); font-size: 0.9rem; margin-top: 0.5rem;">💵 Please pay at the restaurant counter.</p>' : ''}
-            <button id="payment-done-btn">Done</button>
+            <div class="order-summary-row">
+              <span class="label">Total</span>
+              <span class="value">₹${total}</span>
+            </div>
+            <div class="order-summary-row">
+              <span class="label">Payment</span>
+              <span class="value">${pmName}</span>
+            </div>
           </div>
+          ${isCash ? '<p style="color:var(--gold);font-size:0.9rem;margin-top:0.5rem">💵 Please pay at the restaurant counter.</p>' : ''}
+          ${isUpi ? '<p style="color:var(--gold);font-size:0.9rem;margin-top:0.5rem">📱 Complete payment in your UPI app.</p>' : ''}
+          <button id="payment-done-btn" style="margin-top:0.5rem;padding:0.75rem 2rem;background:var(--gradient);color:#fff;border:none;border-radius:var(--radius-sm);font-size:0.9rem;font-weight:600;cursor:pointer">Done</button>
+          <button id="order-again-btn" style="margin-top:0.4rem;padding:0.6rem 2rem;background:none;color:var(--text-secondary);border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius-sm);font-size:0.85rem;font-weight:500;cursor:pointer">Order More</button>
         `;
+        showPaymentSuccessView();
         $('payment-done-btn').addEventListener('click', closePaymentModal);
+        $('order-again-btn').addEventListener('click', closePaymentModal);
       }
 
-      /* ——— Place Order ——— */
-      function placeOrder() {
+      /* ——— Place Order (returns data or null) ——— */
+      async function placeOrder() {
         const cart = getCart();
-        if (cart.length === 0 || placeBtn.disabled) return;
+        if (cart.length === 0) return null;
         if (!TABLE_NUMBER) {
           showToast('Table number not found. Please scan the QR code.', 'check');
-          return;
+          return null;
         }
-        const total = cart.reduce((s, i) => s + i.unit_price * i.quantity, 0);
-        openPaymentModal(total);
+
+        const btn = selectedPaymentMethod === 'upi' ? upiPayNowBtn : confirmPaymentBtn;
+        btn.disabled = true;
+        btn.classList.add('loading');
+
+        try {
+          const body = {
+            table_number: parseInt(TABLE_NUMBER, 10),
+            note: '',
+            items: cart
+          };
+          if (selectedPaymentMethod) {
+            body.payment_method_code = selectedPaymentMethod;
+          }
+
+          const resp = await fetch(API_ORDER_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify(body)
+          });
+          const data = await resp.json();
+          if (resp.ok && data.success) {
+            const pmName = data.payment_method ? data.payment_method.name : 'Not selected';
+            showPaymentSuccess(data.order_id, data.total, pmName, data.payment_method);
+            localStorage.removeItem(STORAGE_KEY);
+            renderCart();
+            syncCardQuantities();
+            closeCart();
+            return data;
+          } else {
+            showToast('Order failed. Please try again.', 'check');
+            btn.disabled = false;
+            btn.classList.remove('loading');
+            return null;
+          }
+        } catch (err) {
+          showToast('Network error. Please check your connection.', 'check');
+          btn.disabled = false;
+          btn.classList.remove('loading');
+          return null;
+        }
       }
 
       /* ——— Category Tabs ——— */
@@ -689,10 +773,11 @@
           });
         });
 
-        /* Card quantity +/- buttons (delegated) */
-        document.querySelector('.menu-grid')?.addEventListener('click', function(e) {
+        /* Card quantity +/- buttons (delegated on body for all category grids) */
+        document.body.addEventListener('click', function(e) {
           const btn = e.target.closest('.card-qty-btn');
           if (!btn) return;
+          if (!btn.closest('.menu-card')) return;
           const id = parseInt(btn.dataset.id, 10);
           if (!id) return;
           const card = btn.closest('.menu-card');
