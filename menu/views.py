@@ -11,6 +11,8 @@ def menu_view(request):
     context = {
         "categories": categories,
         "table_number": table_number,
+        "restaurant_name": "The Grand",
+        "restaurant_suffix": "Kitchen",
     }
     return render(request, "menu/menu.html", context)
 
