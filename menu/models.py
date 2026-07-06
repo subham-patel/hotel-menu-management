@@ -49,7 +49,8 @@ class Table(models.Model):
             self.generate_qr_code()
 
     def generate_qr_code(self):
-        menu_url = f"{reverse('menu_view')}?table={self.number}"
+        from django.conf import settings
+        menu_url = f"{settings.SITE_DOMAIN}{reverse('menu_view')}?table={self.number}"
         qr = qrcode.make(menu_url, box_size=10, border=4)
         buffer = BytesIO()
         qr.save(buffer, format="PNG")
