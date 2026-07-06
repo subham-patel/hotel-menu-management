@@ -4,7 +4,7 @@ from io import BytesIO
 from django.db import models
 from django.core.files.base import ContentFile
 from django.urls import reverse
-
+from django.conf import settings
 
 class Category(models.Model):
     name = models.CharField(max_length=100)
@@ -49,8 +49,9 @@ class Table(models.Model):
             self.generate_qr_code()
 
     def generate_qr_code(self):
-        from django.conf import settings
-        menu_url = f"{settings.SITE_DOMAIN}{reverse('menu_view')}?table={self.number}"
+        domain = settings.SITE_DOMAIN.rstrip('/')
+        menu_url = f"{domain}{reverse('menu_view')}?table={self.number}"
+        
         qr = qrcode.make(menu_url, box_size=10, border=4)
         buffer = BytesIO()
         qr.save(buffer, format="PNG")
