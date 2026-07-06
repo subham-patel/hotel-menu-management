@@ -11,15 +11,6 @@ def seed_payment_methods(apps, schema_editor):
             "is_active": True,
         },
     )
-    PaymentMethod.objects.get_or_create(
-        code="upi",
-        defaults={
-            "name": "Pay by UPI",
-            "description": "Pay using any UPI app (Google Pay, PhonePe, Paytm)",
-            "upi_id": "restaurant@upi",
-            "is_active": True,
-        },
-    )
 
 
 class Migration(migrations.Migration):
