@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.template.response import TemplateResponse
+from django.utils.safestring import mark_safe
 from .models import Category, MenuItem, Table, Order, OrderItem
 
 
@@ -50,12 +50,8 @@ class OrderAdmin(admin.ModelAdmin):
     readonly_fields = ["order_id", "total"]
 
     def changelist_view(self, request, extra_context=None):
-        resp = super().changelist_view(request, extra_context)
-        if isinstance(resp, TemplateResponse):
-            resp.add_post_render_callback(
-                lambda r: r.content.replace(
-                    b"</head>",
-                    b'<meta http-equiv="refresh" content="10"></head>',
-                )
-            )
-        return resp
+        extra_context = extra_context or {}
+        extra_context["subtitle"] = mark_safe(
+            '<script>setTimeout(function(){ window.location.reload(); }, 10000);</script>'
+        )
+        return super().changelist_view(request, extra_context=extra_context)
