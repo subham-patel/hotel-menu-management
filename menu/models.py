@@ -44,8 +44,9 @@ class Table(models.Model):
         return f"Table {self.number}"
 
     def save(self, *args, **kwargs):
+        is_new = not self.pk
         super().save(*args, **kwargs)
-        if not self.qr_code:
+        if is_new:
             self.generate_qr_code()
 
     def generate_qr_code(self):
