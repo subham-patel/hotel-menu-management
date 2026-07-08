@@ -1,10 +1,12 @@
 import base64
+import threading
 from django.http import HttpResponse, Http404
 from django.shortcuts import render, get_object_or_404
 from rest_framework import generics, status
 from rest_framework.response import Response
 from .models import Category, MenuItem, PaymentMethod, Order, Table
 from .serializers import CategorySerializer, MenuItemSerializer, PaymentMethodSerializer, CreateOrderSerializer
+from .utils import notify_invoice
 
 
 def menu_view(request):
@@ -55,12 +57,19 @@ class PlaceOrderAPIView(generics.CreateAPIView):
                 "code": order.payment_method.code,
                 "name": order.payment_method.name,
             }
+
+        if order.phone:
+            threading.Thread(target=notify_invoice, args=[order], daemon=True).start()
+
         return Response(
             {
                 "success": True,
                 "order_id": order.order_id,
                 "total": str(order.total),
+                "subtotal": str(order.subtotal),
+                "gst_amount": str(order.gst_amount),
                 "payment_method": payment_method,
+                "phone": order.phone,
                 "message": f"Order {order.order_id} placed successfully!",
             },
             status=status.HTTP_201_CREATED,

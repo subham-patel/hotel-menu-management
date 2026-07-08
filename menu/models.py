@@ -101,10 +101,15 @@ class Order(models.Model):
     order_id = models.CharField(max_length=12, unique=True, editable=False)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     note = models.TextField(blank=True)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    gst_amount = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
+    phone = models.CharField(max_length=15, blank=True, verbose_name="Mobile Number")
     payment_method = models.ForeignKey(
         PaymentMethod, on_delete=models.SET_NULL, null=True, blank=True, related_name="orders"
     )
+    utrn = models.CharField(max_length=50, blank=True, verbose_name="UPI Transaction Reference")
+    payment_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

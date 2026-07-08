@@ -138,15 +138,39 @@ class OrderAdmin(admin.ModelAdmin):
     list_display = [
         "order_id",
         "table",
+        "phone",
         "status",
         "payment_method",
+        "utrn_display",
+        "payment_verified",
+        "subtotal",
+        "gst_display",
         "total",
         "created_at",
     ]
-    list_filter = ["status", "payment_method", "created_at"]
-    list_editable = ["status"]
+    list_filter = ["status", "payment_method", "payment_verified", "created_at"]
+    list_editable = ["status", "payment_verified"]
     inlines = [OrderItemInline]
-    readonly_fields = ["order_id", "total"]
+    readonly_fields = ["order_id", "subtotal", "gst_amount", "total"]
+    fieldsets = [
+        (None, {
+            "fields": ["order_id", "table", "phone", "status", "note"],
+        }),
+        ("Billing", {
+            "fields": ["subtotal", "gst_amount", "total"],
+        }),
+        ("Payment", {
+            "fields": ["payment_method", "utrn", "payment_verified"],
+        }),
+    ]
+
+    def gst_display(self, obj):
+        return f"₹{obj.gst_amount:.2f}"
+    gst_display.short_description = "GST (5%)"
+
+    def utrn_display(self, obj):
+        return obj.utrn if obj.utrn else "—"
+    utrn_display.short_description = "UTRN"
 
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}

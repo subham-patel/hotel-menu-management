@@ -156,3 +156,15 @@ SITE_DOMAIN = os.environ.get("SITE_DOMAIN", "http://localhost:8000")
 # 🔒 QR CODES are now served from the database (qr_code_data base64 field), so they
 #    will work even without cloud storage. But menu item images and UPI QR codes
 #    still need persistent file storage in production.
+
+# GST
+GST_RATE = 0.05  # 5% (CGST 2.5% + SGST 2.5%)
+
+# Twilio SMS
+TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
+TWILIO_PHONE_NUMBER = os.environ.get("TWILIO_PHONE_NUMBER", "")
+
+# WhatsApp Cloud API
+WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN", "")
+WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")

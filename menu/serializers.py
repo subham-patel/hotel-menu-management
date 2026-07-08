@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.conf import settings
 from .models import Category, MenuItem, Table, Order, OrderItem, PaymentMethod
 
 
@@ -40,7 +41,10 @@ class OrderSerializer(serializers.ModelSerializer):
             "table",
             "status",
             "note",
+            "subtotal",
+            "gst_amount",
             "total",
+            "phone",
             "items",
             "payment_method",
             "created_at",
@@ -59,6 +63,8 @@ class CreateOrderSerializer(serializers.Serializer):
     note = serializers.CharField(required=False, allow_blank=True)
     items = CreateOrderItemSerializer(many=True)
     payment_method_code = serializers.CharField(required=False, allow_blank=True)
+    utrn = serializers.CharField(required=False, allow_blank=True)
+    phone = serializers.CharField(required=False, allow_blank=True)
 
     def validate_table_number(self, value):
         if not Table.objects.filter(number=value).exists():
@@ -76,20 +82,25 @@ class CreateOrderSerializer(serializers.Serializer):
         items_data = validated_data.pop("items")
         note = validated_data.pop("note", "")
         payment_method_code = validated_data.pop("payment_method_code", None)
+        utrn = validated_data.pop("utrn", "")
+        phone = validated_data.pop("phone", "")
 
         payment_method = None
         if payment_method_code:
             payment_method = PaymentMethod.objects.get(code=payment_method_code)
 
-        order = Order.objects.create(table=table, note=note, payment_method=payment_method)
+        order = Order.objects.create(
+            table=table, note=note, payment_method=payment_method,
+            utrn=utrn, phone=phone,
+        )
 
-        total = 0
+        subtotal = 0
         order_items = []
         for item_data in items_data:
             unit_price = item_data["unit_price"]
             quantity = item_data["quantity"]
             line_total = unit_price * quantity
-            total += line_total
+            subtotal += line_total
             order_items.append(
                 OrderItem(
                     order=order,
@@ -100,6 +111,11 @@ class CreateOrderSerializer(serializers.Serializer):
                 )
             )
         OrderItem.objects.bulk_create(order_items)
+
+        gst_amount = round(subtotal * settings.GST_RATE, 2)
+        total = subtotal + gst_amount
+        order.subtotal = subtotal
         order.total = total
-        order.save(update_fields=["total"])
+        order.gst_amount = gst_amount
+        order.save(update_fields=["subtotal", "total", "gst_amount"])
         return order

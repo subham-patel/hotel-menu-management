@@ -172,6 +172,11 @@
         <div class="total-label">Total Bill</div>
         <div class="total-amount" id="payment-total">₹0.00</div>
       </div>
+      <div class="payment-phone-field">
+        <label class="payment-phone-label" for="payment-phone-input">📱 Mobile Number (for invoice)</label>
+        <input type="tel" id="payment-phone-input" class="payment-phone-input" placeholder="e.g. 9876543210" maxlength="15" autocomplete="tel" />
+        <span class="payment-phone-error" id="payment-phone-error"></span>
+      </div>
       <div class="payment-methods-list" id="payment-methods-list">
         <div class="payment-methods-loading">Loading payment methods...</div>
       </div>
@@ -187,6 +192,11 @@
           <span class="upi-id-label">UPI ID</span>
           <span class="upi-id-value" id="upi-id-value"></span>
           <button class="upi-copy-btn" id="upi-copy-btn">Copy</button>
+        </div>
+        <div class="upi-utrn-field" id="upi-utrn-field" style="display:none">
+          <label class="upi-utrn-label" for="upi-utrn-input">Enter UPI Transaction Reference (UTR)</label>
+          <input type="text" id="upi-utrn-input" class="upi-utrn-input" placeholder="e.g. 123456789012" maxlength="50" autocomplete="off" />
+          <span class="upi-utrn-error" id="upi-utrn-error"></span>
         </div>
         <button class="upi-pay-now-btn" id="upi-pay-now-btn">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
@@ -609,6 +619,9 @@
               if (pm) {
                 if (pm.upi_qr_code) { upiQrImg.src = pm.upi_qr_code; upiQrWrap.style.display = 'block'; }
                 if (pm.upi_id) { upiIdValue.textContent = pm.upi_id; upiIdDisplay.style.display = 'flex'; }
+                $('upi-utrn-field').style.display = 'none';
+                $('upi-utrn-input').value = '';
+                $('upi-utrn-error').textContent = '';
                 paymentUpiDetails.classList.add('show');
                 const total = getCart().reduce((s, i) => s + i.unit_price * i.quantity, 0);
                 upiPayAmount = total;
@@ -622,8 +635,19 @@
 
         upiPayNowBtn.addEventListener('click', function() {
           if (upiConfirmationMode) {
+            const utrnInput = $('upi-utrn-input');
+            const utrnError = $('upi-utrn-error');
+            const utrn = utrnInput.value.trim();
+            if (!utrn) {
+              utrnError.textContent = 'Please enter the UPI Transaction Reference from your UPI app.';
+              utrnInput.focus();
+              return;
+            }
+            utrnError.textContent = '';
             upiConfirmationMode = false;
-            placeOrder();
+            placeOrder(utrn).then(success => {
+              if (!success) upiConfirmationMode = true;
+            });
             return;
           }
 
@@ -666,20 +690,21 @@
         });
       }
 
-      function showPaymentSuccess(orderId, total, pmName, pmData) {
+      function showPaymentSuccess(orderId, total, pmName, pmData, phone) {
         const isCash = pmName.toLowerCase().includes('cash');
         const isUpi = pmData && pmData.code === 'upi';
         paymentSuccessState.innerHTML = `
           <div class="success-icon">${isCash ? '💵' : isUpi ? '📱' : '✅'}</div>
           <h3>Order Placed!</h3>
           <p>Your order has been sent to the kitchen.</p>
+          ${phone ? '<p class="success-note">📨 Invoice sent to ' + phone + ' via SMS & WhatsApp.</p>' : ''}
           <div class="order-summary">
             <div class="order-summary-row"><span class="label">Order ID</span><span class="value">${orderId}</span></div>
             <div class="order-summary-row"><span class="label">Total</span><span class="value">₹${total}</span></div>
             <div class="order-summary-row"><span class="label">Payment</span><span class="value">${pmName}</span></div>
           </div>
           ${isCash ? '<p class="success-note">💵 Please pay at the restaurant counter.</p>' : ''}
-          ${isUpi ? '<p class="success-note">📱 Complete payment in your UPI app.</p>' : ''}
+          ${isUpi ? '<p class="success-note">📱 UPI Transaction Reference recorded. Staff will verify payment.</p>' : ''}
           <div class="success-actions">
             <button id="payment-done-btn">Done</button>
             <button id="order-again-btn" class="btn-secondary">Order More</button>
@@ -694,18 +719,29 @@
       }
 
       /* ——— Place Order ——— */
-      async function placeOrder() {
+      async function placeOrder(utrn) {
         const cart = getCart();
         if (cart.length === 0) return null;
         if (!TABLE_NUMBER) { showToast('Table number not found.', 'check'); return null; }
+
+        const phoneInput = $('payment-phone-input');
+        const phoneError = $('payment-phone-error');
+        const phone = phoneInput.value.trim();
+        if (!phone) {
+          phoneError.textContent = 'Please enter your mobile number for the invoice.';
+          phoneInput.focus();
+          return null;
+        }
+        phoneError.textContent = '';
 
         const btn = selectedPaymentMethod === 'upi' ? upiPayNowBtn : confirmPaymentBtn;
         btn.disabled = true;
         btn.classList.add('loading');
 
         try {
-          const body = { table_number: parseInt(TABLE_NUMBER, 10), note: '', items: cart };
+          const body = { table_number: parseInt(TABLE_NUMBER, 10), note: '', items: cart, phone: phone };
           if (selectedPaymentMethod) body.payment_method_code = selectedPaymentMethod;
+          if (utrn) body.utrn = utrn;
 
           const resp = await fetch(API_ORDER_URL, {
             method: 'POST',
@@ -715,7 +751,7 @@
           const data = await resp.json();
           if (resp.ok && data.success) {
             const pmName = data.payment_method ? data.payment_method.name : 'Not selected';
-            showPaymentSuccess(data.order_id, data.total, pmName, data.payment_method);
+            showPaymentSuccess(data.order_id, data.total, pmName, data.payment_method, data.phone);
             localStorage.removeItem(STORAGE_KEY);
             renderCart();
             syncCardQuantities();
@@ -762,9 +798,15 @@
           paymentUpiDetails.classList.add('show');
           upiPayAmount = total;
           upiPayAmountLabel.textContent = '₹' + total.toFixed(2);
+          const utrnField = $('upi-utrn-field');
+          const utrnInput = $('upi-utrn-input');
+          const utrnError = $('upi-utrn-error');
+          utrnField.style.display = 'block';
+          utrnInput.value = '';
+          utrnError.textContent = '';
           confirmPaymentBtn.style.display = 'none';
           upiPayNowBtn.style.display = 'flex';
-          upiPayNowBtn.innerHTML = '<span>✅ I\'ve Paid – Place Order</span>';
+          upiPayNowBtn.innerHTML = '<span>🔍 Verify & Place Order</span>';
           upiPayNowBtn.disabled = false;
           upiConfirmationMode = true;
         }
