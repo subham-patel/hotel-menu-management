@@ -3,6 +3,8 @@ from django.urls import path
 from django.shortcuts import redirect
 from django.utils.safestring import mark_safe
 from django.contrib import messages
+from django.http import HttpResponse
+import base64
 from .models import Category, MenuItem, Table, Order, OrderItem, PaymentMethod
 
 
@@ -40,7 +42,7 @@ class MenuItemAdmin(admin.ModelAdmin):
 @admin.register(Table)
 class TableAdmin(admin.ModelAdmin):
     list_display = ["number", "qr_code_preview", "created_at"]
-    readonly_fields = ["qr_code"]
+    readonly_fields = ["qr_code", "qr_code_data"]
     actions = ["regenerate_qr_codes"]
 
     def get_urls(self):
@@ -51,6 +53,11 @@ class TableAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.regenerate_single_qr),
                 name="menu_table_regenerate_qr",
             ),
+            path(
+                "<int:table_id>/download-qr/",
+                self.admin_site.admin_view(self.download_qr),
+                name="menu_table_download_qr",
+            ),
         ]
         return custom_urls + urls
 
@@ -59,6 +66,16 @@ class TableAdmin(admin.ModelAdmin):
         table.generate_qr_code()
         self.message_user(request, f"QR code regenerated for Table {table.number}.", messages.SUCCESS)
         return redirect(request.META.get("HTTP_REFERER", "admin:menu_table_changelist"))
+
+    def download_qr(self, request, table_id):
+        table = Table.objects.get(id=table_id)
+        if not table.qr_code_data:
+            self.message_user(request, f"No QR code available for Table {table.number}.", messages.ERROR)
+            return redirect(request.META.get("HTTP_REFERER", "admin:menu_table_changelist"))
+        img_data = base64.b64decode(table.qr_code_data)
+        response = HttpResponse(img_data, content_type="image/png")
+        response["Content-Disposition"] = f'attachment; filename="table_{table.number}_qr.png"'
+        return response
 
     @admin.action(description="Regenerate QR codes for selected tables")
     def regenerate_qr_codes(self, request, queryset):
@@ -70,16 +87,20 @@ class TableAdmin(admin.ModelAdmin):
 
     def qr_code_preview(self, obj):
         try:
-            img = ''
             if obj.qr_code_data:
-                img = f'<img src="data:image/png;base64,{obj.qr_code_data}" width="100" height="100" style="display:block;margin-bottom:4px" />'
+                img = f'data:image/png;base64,{obj.qr_code_data}'
             elif obj.qr_code and obj.qr_code.storage.exists(obj.qr_code.name):
-                img = f'<img src="{obj.qr_code.url}" width="100" height="100" style="display:block;margin-bottom:4px" />'
+                img = obj.qr_code.url
             else:
-                img = '<span style="color:#999">QR unavailable</span>'
-            url = f"../{obj.id}/regenerate-qr/"
+                return mark_safe(
+                    '<span style="color:#999">QR unavailable</span>'
+                    f'<br><a href="../{obj.id}/regenerate-qr/" style="font-size:0.75rem">Generate</a>'
+                )
             return mark_safe(
-                f'{img}<a href="{url}" style="font-size:0.75rem" onclick="return confirm(\'Regenerate QR code for Table {obj.number}?\')">🔄 Regenerate</a>'
+                f'<img src="{img}" width="100" height="100" style="display:block;margin-bottom:4px" />'
+                f'<a href="../{obj.id}/download-qr/" style="font-size:0.75rem">⬇ Download</a> | '
+                f'<a href="../{obj.id}/regenerate-qr/" style="font-size:0.75rem" '
+                f'onclick="return confirm(\'Regenerate QR code for Table {obj.number}?\')">🔄 Regenerate</a>'
             )
         except Exception:
             return mark_safe("—")

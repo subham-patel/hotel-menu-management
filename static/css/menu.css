@@ -1182,6 +1182,18 @@ main {
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.success-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.success-actions button {
+  flex: 1;
+  max-width: 160px;
+}
+
 .payment-success-state .order-summary-row {
   display: flex;
   justify-content: space-between;
@@ -1208,6 +1220,25 @@ main {
 #payment-done-btn:hover {
   box-shadow: 0 6px 30px rgba(248, 87, 166, 0.4);
   transform: translateY(-2px);
+}
+
+#order-again-btn {
+  margin-top: 0.5rem;
+  padding: 0.75rem 2rem;
+  background: transparent;
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+#order-again-btn:hover {
+  border-color: var(--accent-1);
+  color: var(--accent-1);
+  background: var(--bg-secondary);
 }
 
 .payment-methods-loading {

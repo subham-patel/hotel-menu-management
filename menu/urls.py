@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path("", views.menu_view, name="menu_view"),
+    path("qr-image/<int:table_id>/", views.qr_code_image_view, name="qr_code_image"),
     path(
         "api/categories/",
         views.CategoryListAPIView.as_view(),

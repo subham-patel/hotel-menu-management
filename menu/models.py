@@ -34,7 +34,7 @@ class MenuItem(models.Model):
 
 class Table(models.Model):
     number = models.IntegerField(unique=True, verbose_name="Table Number")
-    qr_code = models.ImageField(upload_to="qr_codes/", blank=True, editable=False)
+    qr_code = models.ImageField(upload_to="qr_codes/", blank=True, null=True, editable=False)
     qr_code_data = models.TextField(blank=True, editable=False, help_text="Base64-encoded QR code image (permanent storage)")
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -47,7 +47,7 @@ class Table(models.Model):
     def save(self, *args, **kwargs):
         is_new = not self.pk
         super().save(*args, **kwargs)
-        if is_new:
+        if is_new or not self.qr_code_data:
             self.generate_qr_code()
 
     def generate_qr_code(self):
@@ -62,6 +62,12 @@ class Table(models.Model):
         filename = f"table_{self.number}.png"
         self.qr_code.save(filename, ContentFile(buffer.getvalue()), save=False)
         self.save(update_fields=["qr_code", "qr_code_data"])
+
+    @property
+    def qr_code_image_url(self):
+        if self.qr_code_data:
+            return f"data:image/png;base64,{self.qr_code_data}"
+        return ""
 
 
 class PaymentMethod(models.Model):

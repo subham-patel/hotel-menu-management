@@ -1,7 +1,9 @@
-from django.shortcuts import render
+import base64
+from django.http import HttpResponse, Http404
+from django.shortcuts import render, get_object_or_404
 from rest_framework import generics, status
 from rest_framework.response import Response
-from .models import Category, MenuItem, PaymentMethod, Order
+from .models import Category, MenuItem, PaymentMethod, Order, Table
 from .serializers import CategorySerializer, MenuItemSerializer, PaymentMethodSerializer, CreateOrderSerializer
 
 
@@ -15,6 +17,14 @@ def menu_view(request):
         "restaurant_suffix": "Kitchen",
     }
     return render(request, "menu/menu.html", context)
+
+
+def qr_code_image_view(request, table_id):
+    table = get_object_or_404(Table, id=table_id)
+    if not table.qr_code_data:
+        raise Http404("QR code not available")
+    image_data = base64.b64decode(table.qr_code_data)
+    return HttpResponse(image_data, content_type="image/png")
 
 
 class CategoryListAPIView(generics.ListAPIView):

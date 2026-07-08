@@ -133,3 +133,26 @@ CORS_ALLOW_ALL_ORIGINS = True
 import os
 
 SITE_DOMAIN = os.environ.get("SITE_DOMAIN", "http://localhost:8000")
+# ⚠ CRITICAL: SITE_DOMAIN must be set to your production URL (e.g., "https://yourdomain.com").
+# The QR code embeds this URL permanently. If it's wrong, ALL generated QR codes will be invalid.
+# On Render/Railway/Heroku, set SITE_DOMAIN as an environment variable in your dashboard.
+
+# ☁ PRODUCTION FILE STORAGE RECOMMENDATION
+# Hosting platforms (Render, Heroku, Railway) have EPHEMERAL filesystems — all uploaded
+# images (menu items, UPI QR codes) are deleted when the service restarts.
+# For permanent file storage, use cloud storage like S3:
+#
+#   pip install django-storages boto3
+#   AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+#   AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+#   AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_STORAGE_BUCKET_NAME")
+#   AWS_S3_REGION_NAME = os.environ.get("AWS_S3_REGION_NAME", "us-east-1")
+#   AWS_S3_CUSTOM_DOMAIN = os.environ.get("AWS_S3_CUSTOM_DOMAIN")
+#   STORAGES = {
+#       "default": {"BACKEND": "storages.backends.s3boto3.S3Boto3Storage"},
+#       "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+#   }
+#
+# 🔒 QR CODES are now served from the database (qr_code_data base64 field), so they
+#    will work even without cloud storage. But menu item images and UPI QR codes
+#    still need persistent file storage in production.
