@@ -484,6 +484,7 @@
       /* ——— Payment Modal ——— */
       let selectedPaymentMethod = null;
       let paymentMethods = [];
+      let upiConfirmationMode = false;
       const paymentOverlay = $('payment-overlay');
       const paymentModal = $('payment-modal');
       const paymentTotal = $('payment-total');
@@ -537,6 +538,7 @@
         showPaymentSelection();
         paymentTotal.textContent = '₹' + total.toFixed(2);
         selectedPaymentMethod = null;
+        upiConfirmationMode = false;
         upiPayNowBtn.style.display = 'none';
         upiPayNowBtn.disabled = false;
         upiPayNowBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Pay via UPI';
@@ -559,6 +561,7 @@
         paymentOverlay.classList.remove('open');
         showPaymentSelection();
         selectedPaymentMethod = null;
+        upiConfirmationMode = false;
       }
 
       function getPaymentIcon(code) {
@@ -618,6 +621,12 @@
         });
 
         upiPayNowBtn.addEventListener('click', function() {
+          if (upiConfirmationMode) {
+            upiConfirmationMode = false;
+            placeOrder();
+            return;
+          }
+
           const pm = paymentMethods.find(p => p.code === 'upi');
           if (!pm || !pm.upi_id || upiPayAmount <= 0) return;
 
@@ -742,35 +751,22 @@
         const cart = getCart();
         if (cart.length === 0) return;
 
-        upiPayNowBtn.disabled = true;
-        upiPayNowBtn.textContent = 'Placing order...';
+        const total = cart.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+        openPaymentModal(total);
 
-        try {
-          const body = {
-            table_number: data.tableNumber,
-            note: '',
-            items: cart,
-            payment_method_code: 'upi'
-          };
-          const resp = await fetch(API_ORDER_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-            body: JSON.stringify(body)
-          });
-          const result = await resp.json();
-          if (resp.ok && result.success) {
-            showPaymentSuccess(result.order_id, result.total, 'UPI', { code: 'upi' });
-            localStorage.removeItem(STORAGE_KEY);
-            renderCart();
-            syncCardQuantities();
-            closeCart();
-          } else {
-            showToast('Order failed. Please contact staff.', 'check');
-            resetUpiButton();
-          }
-        } catch (_) {
-          showToast('Network error. Please contact staff.', 'check');
-          resetUpiButton();
+        selectedPaymentMethod = 'upi';
+        const pm = paymentMethods.find(p => p.code === 'upi');
+        if (pm) {
+          if (pm.upi_qr_code) { upiQrImg.src = pm.upi_qr_code; upiQrWrap.style.display = 'block'; }
+          if (pm.upi_id) { upiIdValue.textContent = pm.upi_id; upiIdDisplay.style.display = 'flex'; }
+          paymentUpiDetails.classList.add('show');
+          upiPayAmount = total;
+          upiPayAmountLabel.textContent = '₹' + total.toFixed(2);
+          confirmPaymentBtn.style.display = 'none';
+          upiPayNowBtn.style.display = 'flex';
+          upiPayNowBtn.innerHTML = '<span>✅ I\'ve Paid – Place Order</span>';
+          upiPayNowBtn.disabled = false;
+          upiConfirmationMode = true;
         }
       }
 
