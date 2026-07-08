@@ -621,32 +621,9 @@
             }
           });
         });
+      }
 
-        upiPayNowBtn.addEventListener('click', function() {
-          const pm = paymentMethods.find(p => p.code === 'upi');
-          if (!pm || !pm.upi_id || upiPayAmount <= 0) return;
-
-          const upiUrl = 'upi://pay?pa=' + encodeURIComponent(pm.upi_id)
-            + '&pn=' + encodeURIComponent(RESTAURANT_NAME)
-            + '&am=' + upiPayAmount.toFixed(2)
-            + '&cu=INR'
-            + '&tn=' + encodeURIComponent('Order - Table ' + TABLE_NUMBER);
-
-          const phoneInput = $('payment-phone-input');
-          sessionStorage.setItem('pending_upi_order', JSON.stringify({
-            tableNumber: parseInt(TABLE_NUMBER, 10),
-            items: getCart(),
-            phone: phoneInput.value.trim(),
-            upiUrl: upiUrl,
-            timestamp: Date.now()
-          }));
-
-          upiPayNowBtn.disabled = true;
-          upiPayNowBtn.textContent = 'Opening UPI app...';
-          window.location.href = upiUrl;
-        });
-
-        upiCopyBtn.addEventListener('click', function() {
+      upiCopyBtn.addEventListener('click', function() {
           const id = upiIdValue.textContent;
           if (!id) return;
           if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -888,6 +865,42 @@
         confirmPaymentBtn.addEventListener('click', placeOrder);
         paymentCancelBtn.addEventListener('click', closePaymentModal);
         paymentModalBack.addEventListener('click', closePaymentModal);
+
+        upiPayNowBtn.addEventListener('click', function() {
+          const pm = paymentMethods.find(p => p.code === 'upi');
+          if (!pm || !pm.upi_id || upiPayAmount <= 0) return;
+
+          const phoneInput = $('payment-phone-input');
+          if (!phoneInput.value.trim()) {
+            $('payment-phone-error').textContent = 'Please enter your mobile number for the invoice.';
+            phoneInput.focus();
+            return;
+          }
+          $('payment-phone-error').textContent = '';
+
+          const upiUrl = 'upi://pay?pa=' + encodeURIComponent(pm.upi_id)
+            + '&pn=' + encodeURIComponent(RESTAURANT_NAME)
+            + '&am=' + upiPayAmount.toFixed(2)
+            + '&cu=INR'
+            + '&tn=' + encodeURIComponent('Order - Table ' + TABLE_NUMBER);
+
+          sessionStorage.setItem('pending_upi_order', JSON.stringify({
+            tableNumber: parseInt(TABLE_NUMBER, 10),
+            items: getCart(),
+            phone: phoneInput.value.trim(),
+            upiUrl: upiUrl,
+            timestamp: Date.now()
+          }));
+
+          upiPayNowBtn.disabled = true;
+          upiPayNowBtn.textContent = 'Opening UPI app...';
+          const link = document.createElement('a');
+          link.href = upiUrl;
+          link.style.display = 'none';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        });
         paymentOverlay.addEventListener('click', function(e) {
           if (e.target === paymentOverlay) closePaymentModal();
         });
@@ -896,14 +909,20 @@
           this.style.display = 'none';
         });
 
-        loadPaymentMethods();
+        loadPaymentMethods().then(() => {
+          processPendingUPIOrder();
+        });
 
-        processPendingUPIOrder();
-
-        window.addEventListener('focus', function() {
+        function checkPendingUPI() {
           if (sessionStorage.getItem('pending_upi_order')) {
             processPendingUPIOrder();
           }
+        }
+
+        window.addEventListener('pageshow', checkPendingUPI);
+        window.addEventListener('focus', checkPendingUPI);
+        document.addEventListener('visibilitychange', function() {
+          if (!document.hidden) checkPendingUPI();
         });
       });
 
