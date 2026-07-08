@@ -893,12 +893,17 @@
 
           upiPayNowBtn.disabled = true;
           upiPayNowBtn.textContent = 'Opening UPI app...';
-          const link = document.createElement('a');
-          link.href = upiUrl;
-          link.style.display = 'none';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+          let upiBlurred = false;
+          function onBlur() { upiBlurred = true; window.removeEventListener('blur', onBlur); }
+          window.addEventListener('blur', onBlur);
+          window.location.href = upiUrl;
+          setTimeout(function() {
+            window.removeEventListener('blur', onBlur);
+            if (!upiBlurred && sessionStorage.getItem('pending_upi_order')) {
+              resetUpiButton();
+              showToast('No UPI app found. Pay using the UPI ID shown.', 'check');
+            }
+          }, 3000);
         });
         paymentOverlay.addEventListener('click', function(e) {
           if (e.target === paymentOverlay) closePaymentModal();
