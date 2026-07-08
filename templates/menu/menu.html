@@ -623,23 +623,6 @@
         });
       }
 
-      upiCopyBtn.addEventListener('click', function() {
-          const id = upiIdValue.textContent;
-          if (!id) return;
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(id).then(() => {
-              upiCopyBtn.textContent = 'Copied!';
-              setTimeout(() => { upiCopyBtn.textContent = 'Copy'; }, 2000);
-            });
-          } else {
-            const ta = document.createElement('textarea');
-            ta.value = id; document.body.appendChild(ta); ta.select();
-            document.execCommand('copy'); document.body.removeChild(ta);
-            upiCopyBtn.textContent = 'Copied!';
-            setTimeout(() => { upiCopyBtn.textContent = 'Copy'; }, 2000);
-          }
-        });
-
       function showPaymentSuccess(orderId, total, pmName, pmData, phone) {
         const isCash = pmName.toLowerCase().includes('cash');
         const isUpi = pmData && pmData.code === 'upi';
@@ -864,6 +847,25 @@
         confirmPaymentBtn.addEventListener('click', placeOrder);
         paymentCancelBtn.addEventListener('click', closePaymentModal);
         paymentModalBack.addEventListener('click', closePaymentModal);
+
+        if (upiCopyBtn) {
+          upiCopyBtn.addEventListener('click', function() {
+            const id = upiIdValue.textContent;
+            if (!id) return;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(id).then(() => {
+                upiCopyBtn.textContent = 'Copied!';
+                setTimeout(() => { upiCopyBtn.textContent = 'Copy'; }, 2000);
+              });
+            } else {
+              const ta = document.createElement('textarea');
+              ta.value = id; document.body.appendChild(ta); ta.select();
+              document.execCommand('copy'); document.body.removeChild(ta);
+              upiCopyBtn.textContent = 'Copied!';
+              setTimeout(() => { upiCopyBtn.textContent = 'Copy'; }, 2000);
+            }
+          });
+        }
 
         upiPayNowBtn.addEventListener('click', function() {
           const pm = paymentMethods.find(p => p.code === 'upi');
